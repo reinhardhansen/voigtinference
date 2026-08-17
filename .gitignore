@@ -1,0 +1,16 @@
+.DS_Store
+Icon?
+Icon
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+*.log
+*.bak
+*.tar.gz
+nohup.out
+bench/data/
+examples/output/
+examples/raman.csv
+examples/voigt/

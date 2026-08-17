@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voigtinference"
+version = "1.0.0"
+description = "Exact likelihood inference for the Voigt profile from a single Faddeeva evaluation"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Peter Reinhard Hansen", email = "hansen@unc.edu" },
+    { name = "Chen Tong" },
+]
+keywords = [
+    "Voigt profile",
+    "Faddeeva function",
+    "maximum likelihood",
+    "Fisher information",
+    "line shape",
+    "deconvolution",
+    "spectroscopy",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "mpmath>=1.3"]
+examples = ["matplotlib>=3.6", "iminuit>=2.21"]
+
+[project.urls]
+Homepage = "https://github.com/reinhardhansen/voigtinference"
+Repository = "https://github.com/reinhardhansen/voigtinference"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
