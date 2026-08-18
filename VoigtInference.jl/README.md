@@ -33,6 +33,7 @@ r.se                         # exact asymptotic standard errors (expected inform
 
 voigt_pdf(2.0, r.μ, r.σ, r.γ)
 voigt_score(2.0, r.μ, r.σ, r.γ)      # ∂ log f / ∂(μ, σ, γ)
+voigt_pdf_score(2.0, r.μ, r.σ, r.γ)  # both from ONE Faddeeva evaluation
 voigt_hessian(2.0, r.μ, r.σ, r.γ)
 voigt_fisher(r.μ, r.σ, r.γ)          # expected information, quadrature
 

@@ -32,14 +32,27 @@ from voigtinference import (  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 
-MU, SIGMA, GAMMA = 0.3, 1.2, 0.7
+# The primary case plus the two width-ratio extremes: gamma/sigma ~ 1e4 puts
+# the CENTER of the profile in the Cauchy-limit branch (the regime of the
+# 2026-08-18 far-tail audit), gamma/sigma ~ 1e-4 approaches the Gaussian
+# limit.  The Fisher quadrature is compared for the primary case only (at
+# extreme width ratios the two node generators' last-ulp differences are
+# amplified by the integrand, which is a property of quadrature, not of the
+# formulas this file checks).
+THETAS = [
+    (0.3, 1.2, 0.7, True),
+    (0.0, 1.0, 1.0e4, False),
+    (0.0, 1.0, 1.0e-4, False),
+]
 
 
-def grid():
-    scale = np.sqrt(SIGMA**2 + GAMMA**2)
-    bulk = np.array([-8.0, -3.0, -1.0, -0.25, 0.0, 0.25, 1.0, 3.0, 8.0, 40.0])
+def grid(mu, sigma, gamma):
+    scale = np.sqrt(sigma**2 + gamma**2)
+    bulk = scale * np.array(
+        [-8.0, -3.0, -1.0, -0.25, 0.0, 0.25, 1.0, 3.0, 8.0, 40.0]
+    )
     tail = scale * np.array([3e2, 7e2, 1e3, 1.5e3, 1e4, 1e6, 1e8])
-    return np.concatenate([bulk, MU + tail, MU - tail])
+    return np.concatenate([mu + bulk, mu + tail, mu - tail])
 
 
 def main():
@@ -47,18 +60,23 @@ def main():
     ap.add_argument("-o", "--out", default=str(HERE / "reference_python.json"))
     args = ap.parse_args()
 
-    y = grid()
-    ref = {
-        "theta": {"mu": MU, "sigma": SIGMA, "gamma": GAMMA},
-        "y": y.tolist(),
-        "pdf": voigt_pdf(y, MU, SIGMA, GAMMA).tolist(),
-        "logpdf": voigt_logpdf(y, MU, SIGMA, GAMMA).tolist(),
-        "score": voigt_score(y, MU, SIGMA, GAMMA).tolist(),
-        "hessian": voigt_hessian(y, MU, SIGMA, GAMMA).tolist(),
-        "condmean": voigt_condmean(y, MU, SIGMA, GAMMA).tolist(),
-        "condvar": voigt_condvar(y, MU, SIGMA, GAMMA).tolist(),
-        "fisher": voigt_fisher(MU, SIGMA, GAMMA, nodes=400).tolist(),
-    }
+    cases = []
+    for mu, sigma, gamma, with_fisher in THETAS:
+        y = grid(mu, sigma, gamma)
+        case = {
+            "theta": {"mu": mu, "sigma": sigma, "gamma": gamma},
+            "y": y.tolist(),
+            "pdf": voigt_pdf(y, mu, sigma, gamma).tolist(),
+            "logpdf": voigt_logpdf(y, mu, sigma, gamma).tolist(),
+            "score": voigt_score(y, mu, sigma, gamma).tolist(),
+            "hessian": voigt_hessian(y, mu, sigma, gamma).tolist(),
+            "condmean": voigt_condmean(y, mu, sigma, gamma).tolist(),
+            "condvar": voigt_condvar(y, mu, sigma, gamma).tolist(),
+        }
+        if with_fisher:
+            case["fisher"] = voigt_fisher(mu, sigma, gamma, nodes=400).tolist()
+        cases.append(case)
+    ref = {"cases": cases}
 
     data_dir = HERE / "data"
     if (data_dir / "manifest.json").exists():
@@ -86,24 +104,33 @@ def main():
 
     lines = [
         "# Voigt reference values written by bench/crosscheck.py",
-        "# theta <mu> <sigma> <gamma>",
-        "theta " + " ".join(g(v) for v in (MU, SIGMA, GAMMA)),
-        "# fisher <9 entries, row-major>",
-        "fisher " + " ".join(g(v) for v in np.ravel(ref["fisher"])),
+        "# theta <mu> <sigma> <gamma>   starts a case; the fisher and point",
+        "# lines that follow belong to it",
+        "# fisher <9 entries, row-major>  (primary case only)",
         "# point <y> <pdf> <logpdf> <s1 s2 s3> <H11 H12 H13 H22 H23 H33> <condmean> <condvar>",
     ]
-    H = np.asarray(ref["hessian"])
-    for i, yi in enumerate(y):
-        vals = [
-            yi,
-            ref["pdf"][i],
-            ref["logpdf"][i],
-            *ref["score"][i],
-            H[i, 0, 0], H[i, 0, 1], H[i, 0, 2], H[i, 1, 1], H[i, 1, 2], H[i, 2, 2],
-            ref["condmean"][i],
-            ref["condvar"][i],
-        ]
-        lines.append("point " + " ".join(g(v) for v in vals))
+    for case in cases:
+        th = case["theta"]
+        lines.append(
+            "theta " + " ".join(g(th[k]) for k in ("mu", "sigma", "gamma"))
+        )
+        if "fisher" in case:
+            lines.append(
+                "fisher " + " ".join(g(v) for v in np.ravel(case["fisher"]))
+            )
+        H = np.asarray(case["hessian"])
+        for i, yi in enumerate(case["y"]):
+            vals = [
+                yi,
+                case["pdf"][i],
+                case["logpdf"][i],
+                *case["score"][i],
+                H[i, 0, 0], H[i, 0, 1], H[i, 0, 2],
+                H[i, 1, 1], H[i, 1, 2], H[i, 2, 2],
+                case["condmean"][i],
+                case["condvar"][i],
+            ]
+            lines.append("point " + " ".join(g(v) for v in vals))
     if "mle" in ref:
         lines.append("# mle <n> <mu> <sigma> <gamma> <loglik> <iterations>")
         for key, f in sorted(ref["mle"].items(), key=lambda kv: int(kv[0])):
@@ -117,9 +144,10 @@ def main():
     txt_path = pathlib.Path(args.out).with_suffix(".txt")
     txt_path.write_text("\n".join(lines) + "\n")
 
+    npts = sum(len(c["y"]) for c in cases)
     print(f"wrote {args.out}")
     print(f"wrote {txt_path}")
-    print(f"  {len(y)} evaluation points, "
+    print(f"  {len(cases)} theta cases, {npts} evaluation points, "
           f"{'with' if 'mle' in ref else 'without'} MLE fits")
 
 

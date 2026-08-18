@@ -42,9 +42,20 @@ function main()
     mu = 0.0
     sg = 0.0
     gm = 0.0
-    fisher_ref = zeros(3, 3)
-    points = Vector{Vector{Float64}}()
+    ncases = 0
+    npoints = 0
     mle_rows = Vector{Vector{Float64}}()
+
+    worst_d = Dict{String,Float64}()
+    worst_y = Dict{String,Float64}()
+
+    function note(name, d, y)
+        if d > get(worst_d, name, -1.0)
+            worst_d[name] = d
+            worst_y[name] = y
+        end
+        return nothing
+    end
 
     for line in eachline(path)
         if startswith(line, "#")
@@ -59,66 +70,47 @@ function main()
             mu = parse(Float64, parts[2])
             sg = parse(Float64, parts[3])
             gm = parse(Float64, parts[4])
+            ncases += 1
         elseif tag == "fisher"
             v = parse.(Float64, parts[2:10])
+            info = voigt_fisher(mu, sg, gm; nodes = 400)
             for i in 1:3
                 for j in 1:3
-                    fisher_ref[i, j] = v[3 * (i - 1) + j]   # written row-major
+                    ref = v[3 * (i - 1) + j]   # written row-major
+                    # the mu off-diagonals are zero by symmetry; compare
+                    # absolutely there
+                    d = abs(ref) < 1e-10 ? abs(info[i, j] - ref) :
+                                           reldiff(info[i, j], ref)
+                    note("fisher", d, 0.0)
                 end
             end
         elseif tag == "point"
-            push!(points, parse.(Float64, parts[2:end]))
+            p = parse.(Float64, parts[2:end])
+            npoints += 1
+            y = p[1]
+            note("pdf", reldiff(voigt_pdf(y, mu, sg, gm), p[2]), y)
+            note("logpdf", reldiff(voigt_logpdf(y, mu, sg, gm), p[3]), y)
+
+            sc = voigt_score(y, mu, sg, gm)
+            for i in 1:3
+                note("score", reldiff(sc[i], p[3 + i]), y)
+            end
+
+            H = voigt_hessian(y, mu, sg, gm)
+            idx = ((1, 1), (1, 2), (1, 3), (2, 2), (2, 3), (3, 3))
+            for k in 1:6
+                i, j = idx[k]
+                note("hessian", reldiff(H[i, j], p[6 + k]), y)
+            end
+
+            note("condmean", reldiff(voigt_condmean(y, mu, sg, gm), p[13]), y)
+            note("condvar", reldiff(voigt_condvar(y, mu, sg, gm), p[14]), y)
         elseif tag == "mle"
             push!(mle_rows, parse.(Float64, parts[2:end]))
         end
     end
 
-    @printf("theta = (%.6g, %.6g, %.6g);  %d evaluation points\n\n", mu, sg, gm, length(points))
-
-    worst_d = Dict{String,Float64}()
-    worst_y = Dict{String,Float64}()
-
-    function note(name, d, y)
-        if d > get(worst_d, name, -1.0)
-            worst_d[name] = d
-            worst_y[name] = y
-        end
-        return nothing
-    end
-
-    for p in points
-        y = p[1]
-        note("pdf", reldiff(voigt_pdf(y, mu, sg, gm), p[2]), y)
-        note("logpdf", reldiff(voigt_logpdf(y, mu, sg, gm), p[3]), y)
-
-        s = voigt_score(y, mu, sg, gm)
-        for i in 1:3
-            note("score", reldiff(s[i], p[3 + i]), y)
-        end
-
-        H = voigt_hessian(y, mu, sg, gm)
-        idx = ((1, 1), (1, 2), (1, 3), (2, 2), (2, 3), (3, 3))
-        for k in 1:6
-            i, j = idx[k]
-            note("hessian", reldiff(H[i, j], p[6 + k]), y)
-        end
-
-        note("condmean", reldiff(voigt_condmean(y, mu, sg, gm), p[13]), y)
-        note("condvar", reldiff(voigt_condvar(y, mu, sg, gm), p[14]), y)
-    end
-
-    info = voigt_fisher(mu, sg, gm; nodes = 400)
-    for i in 1:3
-        for j in 1:3
-            # the mu off-diagonals are zero by symmetry; compare absolutely there
-            if abs(fisher_ref[i, j]) < 1e-10
-                d = abs(info[i, j] - fisher_ref[i, j])
-            else
-                d = reldiff(info[i, j], fisher_ref[i, j])
-            end
-            note("fisher", d, 0.0)
-        end
-    end
+    @printf("%d theta cases;  %d evaluation points\n\n", ncases, npoints)
 
     @printf("%-12s%14s%14s%16s\n", "quantity", "max rel diff", "tolerance", "at y")
     ok = true

@@ -53,31 +53,34 @@ _SQRT2PI = np.sqrt(2.0 * np.pi)
 _SQRT2OVERPI = np.sqrt(2.0 / np.pi)
 _LOG_SQRT2PI = 0.5 * np.log(2.0 * np.pi)
 
-#: Far-tail switches, as squared multiples of ``sqrt(sigma**2 + gamma**2)``.
+#: Branch switches, expressed through the Cauchy-limit expansion parameter
 #:
-#: The closed-form score and Hessian are algebraically exact but lose precision
-#: to floating-point cancellation in the tail: ``ytil*L`` and
-#: ``sqrt(2/pi)*sigma`` agree to many digits while their *difference* is the
-#: answer.  Out there the profile is Cauchy-dominated and the moment expansion
-#: ``f(y) = c(ytil) + (sigma**2/2) c''(ytil) + O(sigma**4/ytil**6)``, with ``c``
-#: the Cauchy(0, gamma) density, gives limits with relative error
-#: ``O((sigma**2 + gamma**2)/ytil**2)``.  Each switch is placed where the two
-#: error curves cross.
+#:     r = sigma**2 / (ytil**2 + gamma**2).
 #:
-#: The score and the Hessian need *different* switches.  The Hessian recursion
-#: divides the cancelling score components by ``sigma`` and multiplies by
-#: ``ytil`` at every step, so it loses digits far sooner: its crossover sits at
-#: ``|ytil| ~ 40 * sqrt(sigma**2 + gamma**2)``, against ~500 for the score.
-#: Using one switch for both -- as an earlier version of this code did, and as
-#: VoigtInference.jl still does -- leaves the Hessian with no correct digits at
-#: all over roughly a decade and a half of the tail.
+#: The closed-form score and Hessian are algebraically exact but lose digits to
+#: floating-point cancellation whenever the Gaussian component is a small
+#: perturbation of the Cauchy component -- which happens BOTH deep in the tail
+#: (|ytil| large) AND at any |ytil| when gamma >> sigma (large imaginary
+#: Faddeeva argument; digits lost grow like 4*log10(gamma/sigma) at the
+#: center).  In exactly that regime the moment expansion
+#: ``f(y) = c(ytil) + (sigma**2/2) c''(ytil) + O(sigma**4 c4)``, with ``c``
+#: the Cauchy(0, gamma) density and ``c4`` its fourth derivative, is accurate:
+#: its relative error is O(r).  Gating on r therefore covers both failure
+#: modes with one criterion; the earlier |ytil|-based switch missed the
+#: large-gamma/sigma center entirely (2026-08-18 audit, section 4.1).
 #:
-#: Both constants were chosen by minimising the worst-case relative error
-#: against 60-digit ground truth over ``|ytil|/scale`` in ``[1, 1e6]`` and over
-#: a spread of ``(sigma, gamma)``; see ``tests/test_accuracy.py``, which both
-#: verifies the resulting bounds and prints the crossover tables.
-_FAR_TAIL_SQ = 2.5e5        # score and conditional moments: |ytil| > 500 * scale
-_FAR_TAIL_HESS_SQ = 1.6e3   # Hessian:                       |ytil| >  40 * scale
+#: The score and the Hessian need different thresholds: the Hessian recursion
+#: divides cancelling score components by sigma and multiplies by ytil at
+#: every step, so its exact branch loses digits sooner and it must switch to
+#: the expansion earlier (at larger r).
+#:
+#: Minimax-tuned constants (examples/certify.jl tune in the Julia package,
+#: 18 Aug 2026): interior optima on plateaus r_s in [3.5e-7, 5e-7] and
+#: r_h in [4e-5, 6.25e-5]. Certified normwise worst cases over gamma/sigma in
+#: [1e-8, 1e8]: score <= ~5.4e-7, Hessian <= ~1.1e-3, conditional moments
+#: <= ~2e-6 / ~1e-9. Values must match the Julia package bit for bit.
+_R_SCORE = 5.0e-7    # score and conditional moments switch where r < _R_SCORE
+_R_HESS = 6.25e-5    # Hessian switches where r < _R_HESS
 
 
 def _asarray(y):
@@ -115,8 +118,9 @@ def _kl(ytil, sigma, gamma):
     return w.real, w.imag
 
 
-def _far_mask(ytil, sigma, gamma, thresh_sq=_FAR_TAIL_SQ):
-    return ytil * ytil > thresh_sq * (sigma * sigma + gamma * gamma)
+def _far_mask(ytil, sigma, gamma, r_thresh=_R_SCORE):
+    # Cauchy-limit branch used where sigma**2 < r_thresh * (ytil**2 + gamma**2)
+    return sigma * sigma < r_thresh * (ytil * ytil + gamma * gamma)
 
 
 # ----------------------------------------------------------------------
@@ -242,6 +246,36 @@ def voigt_score(y, mu, sigma, gamma):
     return out[0] if scalar else out
 
 
+def voigt_pdf_score(y, mu, sigma, gamma):
+    """Density and score from ONE Faddeeva evaluation.
+
+    Returns ``(pdf, score)`` where ``pdf`` has the shape of
+    :func:`voigt_pdf` and ``score`` the shape of :func:`voigt_score`; both
+    are bit-identical to calling the two functions separately (same ``(K, L)``
+    algebra, same far-tail branch for the score), at half the special-function
+    cost.  This is the natural primitive for least-squares Jacobians of the
+    lineshape, ``df/dtheta = f * s_theta``, as used by
+    ``examples/lmfit_voigt_jacobian.py`` and the Julia ``examples/raman.jl``.
+    """
+    _check(sigma, gamma)
+    yv, scalar = _asarray(y)
+    ytil = yv - mu
+    K, L = _kl(ytil, sigma, gamma)
+    pdf = K / (sigma * _SQRT2PI)
+    smu, ssig, sgam, _ = _score_arrays(ytil, sigma, gamma, K, L)
+
+    far = _far_mask(ytil, sigma, gamma)
+    if far.any():
+        idx = np.flatnonzero(far)
+        tmu, tsig, tgam = _score_tail(ytil[idx], sigma, gamma)
+        smu[idx], ssig[idx], sgam[idx] = tmu, tsig, tgam
+
+    score = np.stack((smu, ssig, sgam), axis=-1)
+    if scalar:
+        return pdf[0], score[0]
+    return pdf, score
+
+
 # ----------------------------------------------------------------------
 # Hessian
 # ----------------------------------------------------------------------
@@ -291,7 +325,7 @@ def voigt_hessian(y, mu, sigma, gamma):
     smu, ssig, sgam, r = _score_arrays(ytil, sigma, gamma, K, L)
     Hmm, Hms, Hmg, Hss, Hgs, Hgg = _hessian_arrays(ytil, sigma, smu, ssig, sgam, r, gamma)
 
-    far = _far_mask(ytil, sigma, gamma, _FAR_TAIL_HESS_SQ)
+    far = _far_mask(ytil, sigma, gamma, _R_HESS)
     if far.any():
         idx = np.flatnonzero(far)
         t = _hessian_tail(ytil[idx], sigma, gamma)
@@ -411,10 +445,11 @@ def loglik_grad_hess(y, mu, sigma, gamma, need_hess=True, need_ll=True, _kl_cach
 
     smu, ssig, sgam, r = _score_arrays(ytil, sigma, gamma, K, L)
 
-    # the Hessian switches over much earlier than the score, so two masks
-    ysq = ytil * ytil
-    thresh = sigma * sigma + gamma * gamma
-    far_s = ysq > _FAR_TAIL_SQ * thresh
+    # the Hessian switches over much earlier than the score, so two masks;
+    # both gate on the expansion parameter r = sigma^2/(ytil^2+gamma^2)
+    s2m = sigma * sigma
+    den_r = ytil * ytil + gamma * gamma
+    far_s = s2m < _R_SCORE * den_r
     has_far_s = bool(far_s.any())
     if has_far_s:
         idx_s = np.flatnonzero(far_s)
@@ -428,7 +463,7 @@ def loglik_grad_hess(y, mu, sigma, gamma, need_hess=True, need_ll=True, _kl_cach
         Hmm, Hms, Hmg, Hss, Hgs, Hgg = _hessian_arrays(
             ytil, sigma, smu, ssig, sgam, r, gamma
         )
-        far_h = ysq > _FAR_TAIL_HESS_SQ * thresh
+        far_h = s2m < _R_HESS * den_r
         if far_h.any():
             idx_h = np.flatnonzero(far_h)
             t = _hessian_tail(ytil[idx_h], sigma, gamma)

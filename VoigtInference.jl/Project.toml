@@ -1,7 +1,7 @@
 name = "VoigtInference"
 uuid = "70c6e13a-0f62-4545-a8b0-5ece11b769b1"
 authors = ["Peter Reinhard Hansen <hansen@unc.edu>", "Chen Tong <tongchen@xmu.edu.cn>"]
-version = "0.1.0"
+version = "1.0.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

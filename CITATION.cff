@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the methods paper below."
+title: "voigtinference: exact likelihood inference for the Voigt profile"
+version: 1.0.0
+date-released: 2026-08-18
+license: MIT
+repository-code: "https://github.com/reinhardhansen/voigtinference"
+authors:
+  - family-names: Hansen
+    given-names: Peter Reinhard
+    email: hansen@unc.edu
+    affiliation: "University of North Carolina at Chapel Hill"
+  - family-names: Tong
+    given-names: Chen
+    email: tongchen@xmu.edu.cn
+    affiliation: "Xiamen University"
+keywords:
+  - Voigt profile
+  - Faddeeva function
+  - maximum likelihood
+  - Fisher information
+  - line shape
+  - spectroscopy
+preferred-citation:
+  type: article
+  title: "Exact likelihood inference and robust filtering for Gauss-Cauchy convolution models"
+  authors:
+    - family-names: Hansen
+      given-names: Peter Reinhard
+    - family-names: Tong
+      given-names: Chen
+  year: 2026
+  journal: "arXiv preprint"
+  identifiers:
+    - type: other
+      value: "arXiv:2605.01665"

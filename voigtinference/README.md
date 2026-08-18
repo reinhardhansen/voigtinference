@@ -34,11 +34,15 @@ resolution `σ`, the event-level mass density is the Voigt profile with `μ = M`
 
 ## Install
 
+From the repository root:
+
 ```bash
-pip install voigtinference
+pip install -e voigtinference            # or: pip install ./voigtinference
 ```
 
-Dependencies: NumPy and SciPy. Nothing else.
+Dependencies: NumPy and SciPy. Nothing else. Optional extras:
+`[test]` (pytest, mpmath) for the test suite and
+`[examples]` (matplotlib, iminuit, lmfit) for the example scripts.
 
 ## Usage
 
@@ -51,10 +55,10 @@ from voigtinference import (
 
 y = rand_voigt(5_000, mu=0.5, sigma=1.0, gamma=0.3, rng=1)
 
-r = voigt_mle(y)              # exact MLE by analytic Newton steps
+r = voigt_mle(y)              # safeguarded Newton with analytic derivatives
 print(r.summary())
 r.mu, r.sigma, r.gamma        # estimates
-r.se                          # exact asymptotic standard errors
+r.se                          # asymptotic Fisher-information standard errors
 r.vcov                        # covariance matrix
 
 voigt_pdf(2.0, r.mu, r.sigma, r.gamma)
@@ -101,7 +105,10 @@ Faddeeva passes rather than around micro-optimising the arithmetic:
 * `loglik_grad_hess` never materialises `(n, 3)` or `(n, 3, 3)` intermediates — it
   accumulates the gradient and Hessian sums directly;
 * the MLE carries the `(K, L)` pair computed by the line search forward to the next
-  iterate, so an *accepted* Newton step costs exactly one Faddeeva pass over the sample.
+  iterate, so an *accepted* Newton step costs exactly one Faddeeva pass over the sample;
+* `voigt_pdf_score` returns the density and the score from one pass — the natural
+  primitive for least-squares Jacobians of the lineshape (`df/dtheta = f * s_theta`),
+  used by `examples/lmfit_voigt_jacobian.py`.
 
 No automatic differentiation, finite differences, numerical convolution, or pseudo-Voigt
 approximations are used anywhere.

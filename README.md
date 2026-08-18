@@ -16,7 +16,7 @@ every evaluation-level quantity:
 Companion papers:
 
 > P. R. Hansen and C. Tong, *Exact likelihood calculus for the Voigt profile
-> from a single Faddeeva evaluation* (software note; submitted to Computer
+> from a single Faddeeva evaluation* (software note; prepared for Computer
 > Physics Communications).
 >
 > P. R. Hansen and C. Tong, *Exact likelihood inference and robust filtering

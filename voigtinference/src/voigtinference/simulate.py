@@ -17,6 +17,10 @@ def rand_voigt(n, mu, sigma, gamma, rng=None):
     rng : None, int, or numpy.random.Generator
         Seed or generator.  ``None`` uses fresh entropy.
     """
+    if sigma < 0.0:
+        raise ValueError("sigma must be >= 0")
+    if gamma < 0.0:
+        raise ValueError("gamma must be >= 0")
     if not isinstance(rng, np.random.Generator):
         rng = np.random.default_rng(rng)
     return (

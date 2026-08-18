@@ -27,6 +27,7 @@ from .core import (
     voigt_loglik,
     voigt_logpdf,
     voigt_pdf,
+    voigt_pdf_score,
     voigt_score,
 )
 from .fisher import voigt_fisher
@@ -38,6 +39,7 @@ __version__ = "1.0.0"
 __all__ = [
     "faddeeva",
     "voigt_pdf",
+    "voigt_pdf_score",
     "voigt_logpdf",
     "voigt_loglik",
     "voigt_score",

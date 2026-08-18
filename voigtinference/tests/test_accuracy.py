@@ -24,8 +24,8 @@ import pytest
 
 from voigtinference import voigt_hessian, voigt_score
 from voigtinference.core import (
-    _FAR_TAIL_HESS_SQ,
-    _FAR_TAIL_SQ,
+    _R_HESS,
+    _R_SCORE,
     _hessian_arrays,
     _hessian_tail,
     _kl,
@@ -54,15 +54,33 @@ def _set_dps(mult):
 
 mp.dps = _BASE_DPS
 
-SCORE_SWITCH = np.sqrt(_FAR_TAIL_SQ)     # in units of sqrt(sigma^2 + gamma^2)
-HESS_SWITCH = np.sqrt(_FAR_TAIL_HESS_SQ)
-
 REGIMES = [(1.0, 0.3), (1.2, 0.7), (1.0, 2.0), (0.5, 0.05)]
 SIGMA, GAMMA = REGIMES[0]
 
 
 def _scale(sigma, gamma):
     return np.sqrt(sigma**2 + gamma**2)
+
+
+def _switch_mult(r_thresh, sigma, gamma):
+    """The r-criterion sigma^2 < r_thresh*(ytil^2 + gamma^2), expressed as the
+    |ytil|/scale multiple at which the branch flips. For the moderate-ratio
+    REGIMES here the criterion is |ytil|-driven; at large gamma/sigma it holds
+    for every ytil (the audit's section 4.1 regime), covered by certify.jl."""
+    arg = sigma * sigma / r_thresh - gamma * gamma
+    return np.sqrt(max(arg, 0.0)) / _scale(sigma, gamma)
+
+
+def _score_switch(sigma=SIGMA, gamma=GAMMA):
+    return _switch_mult(_R_SCORE, sigma, gamma)
+
+
+def _hess_switch(sigma=SIGMA, gamma=GAMMA):
+    return _switch_mult(_R_HESS, sigma, gamma)
+
+
+SCORE_SWITCH = _score_switch()   # default regime, for dispatch and reports
+HESS_SWITCH = _hess_switch()
 
 
 def _w_mp(x, a):
@@ -116,6 +134,16 @@ def _tail_h(a, sigma, gamma):
 
 def _relerr(approx, truth):
     return float(np.max(np.abs(approx - truth) / np.abs(truth)))
+
+
+def _normerr(approx, truth):
+    """Normwise block error: max component error over the block's largest
+    true component. This is the certified metric (see examples/certify.jl in
+    the Julia package): componentwise ratios are meaningless at zeros of the
+    leading-order expansion, and Newton steps / Wald matrices are perturbed
+    at the level of the block norm."""
+    scale = float(np.max(np.abs(truth)))
+    return float(np.max(np.abs(approx - truth))) / scale
 
 
 # ------------------------------------------------------------- the primitive
@@ -195,28 +223,32 @@ def _worst_case(kind, override_hess_switch=None):
         for mult in np.logspace(0, 6, 40):
             yt = mult * scale
             s_t, h_t = _truth(yt, sigma, gamma)
-            hsw = HESS_SWITCH if override_hess_switch is None else override_hess_switch
+            hsw = _hess_switch(sigma, gamma) if override_hess_switch is None \
+                else override_hess_switch
             if kind == "score":
-                got = _tail_branch(yt, sigma, gamma)[0] if mult > SCORE_SWITCH \
+                got = _tail_branch(yt, sigma, gamma)[0] if mult > _score_switch(sigma, gamma) \
                     else _exact_branch(yt, sigma, gamma)[0]
-                err = _relerr(got, s_t)
+                err = _normerr(got, s_t)
             else:
                 got = _tail_branch(yt, sigma, gamma)[1] if mult > hsw \
                     else _exact_branch(yt, sigma, gamma)[1]
-                err = _relerr(got, h_t)
+                err = _normerr(got, h_t)
             if err > worst:
                 worst, where, regime = err, mult, (sigma, gamma)
     return worst, where, regime
 
 
 def test_score_worst_case_relative_error():
+    # certified normwise bound 5.4e-7 on the decade grid; margin for the
+    # intermediate ratios probed here
     worst, where, regime = _worst_case("score")
-    assert worst < 1e-4, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
+    assert worst < 5e-6, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
 
 
 def test_hessian_worst_case_relative_error():
+    # certified normwise bound 1.5e-3 (branch crossover); margin as above
     worst, where, regime = _worst_case("hessian")
-    assert worst < 5e-2, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
+    assert worst < 5e-3, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
 
 
 def test_sharing_the_score_switch_would_wreck_the_hessian():
@@ -238,10 +270,10 @@ def test_public_score_and_hessian_are_uniformly_accurate():
         s = voigt_score(yt, 0.0, SIGMA, GAMMA)
         H = voigt_hessian(yt, 0.0, SIGMA, GAMMA)
         h = np.array([H[0, 0], H[0, 1], H[0, 2], H[1, 1], H[1, 2], H[2, 2]])
-        worst_s = max(worst_s, _relerr(s, s_t))
-        worst_h = max(worst_h, _relerr(h, h_t))
-    assert worst_s < 1e-4, f"score worst {worst_s:.2e}"
-    assert worst_h < 5e-2, f"hessian worst {worst_h:.2e}"
+        worst_s = max(worst_s, _normerr(s, s_t))
+        worst_h = max(worst_h, _normerr(h, h_t))
+    assert worst_s < 5e-6, f"score worst {worst_s:.2e}"
+    assert worst_h < 5e-3, f"hessian worst {worst_h:.2e}"
 
 
 # ------------------------------------------------------------------ reporting

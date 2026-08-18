@@ -170,8 +170,9 @@ function fused_one_eval(y, mu, sg, gm)
     den2 = sg * sqrt(2)
     aim = gm / den2
     logconst = log(sg) + 0.5 * log(2 * pi)
-    cut_s = 2.5e5 * (s2 + gm * gm)      # score switch,   |ytil| > 500 * scale
-    cut_h = 1.6e3 * (s2 + gm * gm)      # Hessian switch, |ytil| >  40 * scale
+    g2 = gm * gm
+    r_s = 5.0e-7                        # score switch   (matches the package)
+    r_h = 6.25e-5                       # Hessian switch (matches the package)
     @inbounds for yi in y
         yt = yi - mu
         yt2 = yt * yt
@@ -189,13 +190,13 @@ function fused_one_eval(y, mu, sg, gm)
         hms = -(smu + gm * hmg - yt * hmm) / sg
         hgs = -(sgm + gm * hgg - yt * hmg) / sg
         hss = -(ssg + gm * hgs - yt * hms) / sg
-        if yt2 > cut_s                                   # Cauchy-limit score
+        if s2 < r_s * (yt2 + g2)                        # Cauchy-limit score
             den = yt2 + gm * gm
             smu = 2 * yt / den
             ssg = sg * (6 * yt2 - 2 * gm^2) / den^2
             sgm = 1 / gm - 2 * gm / den
         end
-        if yt2 > cut_h                                   # Cauchy-limit Hessian
+        if s2 < r_h * (yt2 + g2)                        # Cauchy-limit Hessian
             den = yt2 + gm * gm
             d = 2 * (yt2 - gm^2) / den^2
             q = (6 * yt2 - 2 * gm^2) / den^2

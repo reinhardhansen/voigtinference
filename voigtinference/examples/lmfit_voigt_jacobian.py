@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from voigtinference import voigt_pdf, voigt_score
+from voigtinference import voigt_pdf, voigt_pdf_score
 
 __all__ = ["voigt_lineshape", "voigt_lineshape_jacobian"]
 
@@ -64,8 +64,8 @@ def voigt_lineshape_jacobian(x, amplitude=1.0, center=0.0, sigma=1.0,
     xv = np.asarray(x, dtype=float)
     tied = gamma is None
     g = sigma if tied else gamma
-    pdf = voigt_pdf(xv, center, sigma, g)
-    s = voigt_score(xv, center, sigma, g)          # (n, 3): d/d(mu, sigma, gamma)
+    pdf, s = voigt_pdf_score(xv, center, sigma, g)  # one Faddeeva pass;
+    #                                       s is (n, 3): d/d(mu, sigma, gamma)
     f = amplitude * pdf
     d_amp = pdf
     d_cen = f * s[:, 0]

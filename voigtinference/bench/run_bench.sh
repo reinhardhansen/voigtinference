@@ -97,4 +97,5 @@ hr "Done"
         echo "               'const TOL' at the top of bench/crosscheck.jl is the knob)"
     fi
 }
-exit 0
+# propagate the cross-check result: CI and reviewer scripts must see failures
+exit "${CROSS_STATUS:-0}"

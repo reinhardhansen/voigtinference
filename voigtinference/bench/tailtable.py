@@ -35,7 +35,11 @@ def naive(yt, sg, gm):
     hss = -(ssg + gm * hgs - yt * hms) / sg
     return np.array([smu, ssg, sgm]), np.array([hmm, hms, hmg, hss, hgs, hgg])
 
-relerr = lambda x, ref: max(float(abs(mpf(float(a)) - b) / abs(b)) for a, b in zip(x, ref))
+# normwise block error (the certified metric; see examples/certify.jl in the
+# Julia package): max component error over the block's largest true component.
+def relerr(x, ref):
+    scale = max(abs(b) for b in ref)
+    return max(float(abs(mpf(float(a)) - b) / scale) for a, b in zip(x, ref))
 
 print("PRECISION SELF-CHECK: is 256-bit enough for a HESSIAN reference?")
 print(f"{'mult':>7}{'256-bit vs 512-bit':>24}")
@@ -48,7 +52,8 @@ for e in (1, 4, 6, 8):
 mp.dps = 154
 for sg, gm in ((1.0, 1.0), (1.0, 0.01)):
     sc = np.sqrt(sg**2 + gm**2)
-    print(f"\n(sigma, gamma) = ({sg}, {gm})   switches: score 500x, Hessian 40x")
+    print(f"\n(sigma, gamma) = ({sg}, {gm})   switches: r_s = 5e-7, r_h = 6.25e-5"
+          f"  (r = sigma^2/(ytil^2+gamma^2); normwise errors)")
     print(f"{'|ytil|/scale':>13}{'score pkg':>12}{'score naive':>13}{'HESS pkg':>12}{'HESS naive':>13}")
     for e in range(1, 9):
         yt = 10.0**e * sc

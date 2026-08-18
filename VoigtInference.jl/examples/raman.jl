@@ -41,8 +41,7 @@ function model_jac(p, ν)
     f = zeros(length(ν))
     J = zeros(length(ν), 5)
     for (i, νi) in enumerate(ν)
-        fi = voigt_pdf(νi, μ, σ, γ)
-        s = voigt_score(νi, μ, σ, γ)     # ∂ log f / ∂(μ, σ, γ)
+        fi, s = voigt_pdf_score(νi, μ, σ, γ)   # one Faddeeva pass     # ∂ log f / ∂(μ, σ, γ)
         f[i] = b + A * fi
         J[i, 1] = 1.0
         J[i, 2] = fi
@@ -128,8 +127,7 @@ function model_jac_lin(p, ν)
     f = zeros(length(ν))
     J = zeros(length(ν), 6)
     for (i, νi) in enumerate(ν)
-        fi = voigt_pdf(νi, μ, σ, γ)
-        s = voigt_score(νi, μ, σ, γ)
+        fi, s = voigt_pdf_score(νi, μ, σ, γ)   # one Faddeeva pass
         f[i] = b0 + b1 * (νi - ν̄) + A * fi
         J[i, 1] = 1.0
         J[i, 2] = νi - ν̄
@@ -201,6 +199,7 @@ try
     hline!(p2, [0.0]; ls = :dot, color = :gray, label = "")
     fig = plot(p1, p2; layout = l, size = (700, 500))
     out = joinpath(HERE, "output", "raman_fit.pdf")
+    mkpath(dirname(out))
     savefig(fig, out)
     println("wrote $out")
 catch e

@@ -41,6 +41,19 @@ end
     end
 end
 
+@testset "fused pdf+score identity" begin
+    # voigt_pdf_score must be bit-identical to the separate calls, in both
+    # the exact and the far-tail branch (large |ỹ| and large γ/σ)
+    for (μ, σ, γ, ys) in ((0.3, 1.2, 0.7, (-3.0, 0.31, 2.1, 15.0, 1e6)),
+                          (0.0, 1.0, 1e5, (0.0, 1.0, 1e7)))
+        for y in ys
+            f, s = voigt_pdf_score(y, μ, σ, γ)
+            @test f == voigt_pdf(y, μ, σ, γ)
+            @test s == voigt_score(y, μ, σ, γ)
+        end
+    end
+end
+
 @testset "conditional moments (Tweedie identities)" begin
     μ, σ, γ = 0.3, 1.2, 0.7
     for y in (-2.0, 0.3, 2.1, 8.0)
@@ -85,4 +98,52 @@ end
     # score ≈ 0 at the optimum
     g = sum(voigt_score(yi, r.μ, r.σ, r.γ) for yi in y) / length(y)
     @test norm(g) < 1e-6
+end
+
+@testset "Phase B: boundaries, submodels, diagnostics" begin
+    # interior fit: full diagnostics
+    rng = MersenneTwister(3)
+    y = rand_voigt(rng, 4000, 0.5, 1.0, 0.4)
+    r = voigt_mle(y)
+    @test r.converged && r.termination == :gradient_converged
+    @test !(r.sigma_boundary || r.gamma_boundary || r.upper_boundary)
+    @test all(isfinite, r.se) && all(isfinite, r.se_obs)
+    @test r.expected_info_posdef && r.observed_info_posdef
+    @test r.loglik > r.loglik_gaussian
+    @test r.loglik > r.loglik_cauchy
+
+    # Submodel-true data: on the boundary the local parameter is the width
+    # (γ) or its square (σ²), so the MLE sits at an interior estimate of
+    # order n^(-1/2) or n^(-1/4) in about half of all samples (half-normal
+    # boundary asymptotics). The reliable diagnostic is the submodel
+    # likelihood comparison; the flag fires only when the fit is numerically
+    # the submodel.
+
+    # pure Gaussian data
+    rng = MersenneTwister(11)
+    yg = 0.3 .+ 1.2 .* randn(rng, 3000)
+    rg = voigt_mle(yg)
+    @test rg.loglik - rg.loglik_gaussian < 4.0
+    @test rg.gamma_boundary || rg.γ < 0.05 * rg.σ
+    @test !rg.sigma_boundary
+    rg.gamma_boundary && @test all(isnan, rg.se)
+    @test abs(rg.gaussian_fit.μ - 0.3) < 0.1 && abs(rg.gaussian_fit.σ - 1.2) < 0.1
+
+    # pure Cauchy data
+    rng = MersenneTwister(12)
+    yc = 0.1 .+ 0.7 .* tan.(π .* (rand(rng, 3000) .- 0.5))
+    rc = voigt_mle(yc)
+    @test rc.loglik - rc.loglik_cauchy < 4.0
+    @test rc.sigma_boundary || rc.σ < 0.5 * rc.γ
+    @test !rc.gamma_boundary
+    rc.sigma_boundary && @test all(isnan, rc.se)
+    @test abs(rc.cauchy_fit.μ - 0.1) < 0.1 && abs(rc.cauchy_fit.γ - 0.7) < 0.1
+
+    # multistart never worse; nonfinite data raise
+    y2 = rand_voigt(MersenneTwister(5), 1500, 0.0, 1.0, 0.05)
+    r1 = voigt_mle(y2)
+    r4 = voigt_mle(y2; starts = 4)
+    @test r4.starts == 4
+    @test r4.loglik ≥ r1.loglik - 1e-8
+    @test_throws ArgumentError voigt_mle([1.0, NaN, 2.0])
 end
