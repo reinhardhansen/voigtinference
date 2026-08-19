@@ -7,7 +7,7 @@ name = "voigtinference"
 version = "1.0.0"
 description = "Exact likelihood inference for the Voigt profile from a single Faddeeva evaluation"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Peter Reinhard Hansen", email = "hansen@unc.edu" },

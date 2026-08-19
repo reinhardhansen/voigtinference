@@ -140,9 +140,16 @@ function main()
             end
             yn = collect(reinterpret(Float64, read(f)))
             r = voigt_mle(yn)
-            @printf("%8d%14.2e%14.2e%14.2e%14.2e\n", n,
-                    reldiff(r.μ, row[2]), reldiff(r.σ, row[3]),
-                    reldiff(r.γ, row[4]), reldiff(r.loglik, row[5]))
+            ds = (reldiff(r.μ, row[2]), reldiff(r.σ, row[3]),
+                  reldiff(r.γ, row[4]), reldiff(r.loglik, row[5]))
+            @printf("%8d%14.2e%14.2e%14.2e%14.2e\n", n, ds...)
+            # optimiser-path agreement enforced too (looser than the
+            # evaluation tolerance: paths may differ at the level of the
+            # convergence tolerance)
+            if maximum(ds) > 1e-11
+                ok = false
+                println("        ^ ABOVE the 1e-11 MLE-path tolerance")
+            end
         end
         println("\n(MLE differences reflect the optimiser path, not the formulas;")
         println(" they should sit at the level of the convergence tolerance.)")

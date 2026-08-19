@@ -52,7 +52,8 @@ for e in (1, 4, 6, 8):
 mp.dps = 154
 for sg, gm in ((1.0, 1.0), (1.0, 0.01)):
     sc = np.sqrt(sg**2 + gm**2)
-    print(f"\n(sigma, gamma) = ({sg}, {gm})   switches: r_s = 5e-7, r_h = 6.25e-5"
+    from voigtinference.core import _R_HESS, _R_SCORE
+    print(f"\n(sigma, gamma) = ({sg}, {gm})   switches: r_s = {_R_SCORE:g}, r_h = {_R_HESS:g}"
           f"  (r = sigma^2/(ytil^2+gamma^2); normwise errors)")
     print(f"{'|ytil|/scale':>13}{'score pkg':>12}{'score naive':>13}{'HESS pkg':>12}{'HESS naive':>13}")
     for e in range(1, 9):

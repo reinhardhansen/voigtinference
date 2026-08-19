@@ -120,8 +120,9 @@ def render(py, jl):
             "`passes` counts Faddeeva evaluations over the whole sample. The "
             "Python implementation fuses the gradient and Hessian into one pass "
             "and reuses the line search's evaluation at the accepted step, so an "
-            "accepted Newton iteration costs one pass; the shipped Julia package "
-            "evaluates `w(z)` separately for the score and the Hessian."
+            "accepted Newton iteration costs one pass there and two in Julia "
+            "(the accepted trial's log-likelihood plus the fused "
+            "gradient/Hessian pass); both use the fused per-point kernel."
         )
     else:
         res = py or jl

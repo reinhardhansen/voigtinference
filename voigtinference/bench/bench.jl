@@ -13,6 +13,7 @@
 
 using VoigtInference
 using SpecialFunctions: erfcx
+import SpecialFunctions               # module reference for pkgversion
 using Printf
 using Statistics: median
 
@@ -171,8 +172,8 @@ function fused_one_eval(y, mu, sg, gm)
     aim = gm / den2
     logconst = log(sg) + 0.5 * log(2 * pi)
     g2 = gm * gm
-    r_s = 5.0e-7                        # score switch   (matches the package)
-    r_h = 6.25e-5                       # Hessian switch (matches the package)
+    r_s = 1.0e-5                        # score switch   (matches the package)
+    r_h = 5.0e-4                        # Hessian switch (matches the package)
     @inbounds for yi in y
         yt = yi - mu
         yt2 = yt * yt
@@ -191,21 +192,10 @@ function fused_one_eval(y, mu, sg, gm)
         hgs = -(sgm + gm * hgg - yt * hmg) / sg
         hss = -(ssg + gm * hgs - yt * hms) / sg
         if s2 < r_s * (yt2 + g2)                        # Cauchy-limit score
-            den = yt2 + gm * gm
-            smu = 2 * yt / den
-            ssg = sg * (6 * yt2 - 2 * gm^2) / den^2
-            sgm = 1 / gm - 2 * gm / den
+            smu, ssg, sgm = VoigtInference._score_tail(yt, sg, gm)
         end
         if s2 < r_h * (yt2 + g2)                        # Cauchy-limit Hessian
-            den = yt2 + gm * gm
-            d = 2 * (yt2 - gm^2) / den^2
-            q = (6 * yt2 - 2 * gm^2) / den^2
-            hmm = d
-            hgg = -1 / gm^2 - d
-            hmg = -4 * yt * gm / den^2
-            hms = sg * (-12 * yt / den^2 + 4 * yt * (6 * yt2 - 2 * gm^2) / den^3)
-            hgs = sg * (-4 * gm / den^2 - 4 * gm * (6 * yt2 - 2 * gm^2) / den^3)
-            hss = q
+            hmm, hms, hmg, hss, hgs, hgg = VoigtInference._hessian_tail(yt, sg, gm)
         end
         gmu += smu; gsg += ssg; ggm += sgm
         hmumu += hmm; hmusg += hms; hmugm += hmg
@@ -343,7 +333,8 @@ function main()
     io = IOBuffer()
     println(io, "{")
     println(io, "  \"language\": \"julia\",")
-    println(io, "  \"versions\": {\"julia\": \"$(VERSION)\"},")
+    sfver = string(pkgversion(SpecialFunctions))
+    println(io, "  \"versions\": {\"julia\": \"$(VERSION)\", \"SpecialFunctions\": \"$(sfver)\"},")
     println(io, "  \"platform\": {")
     println(io, "    \"system\": \"$(json_escape(Sys.KERNEL))\",")
     println(io, "    \"machine\": \"$(json_escape(Sys.MACHINE))\",")

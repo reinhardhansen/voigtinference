@@ -1,7 +1,7 @@
 # Certification of the double-precision Voigt likelihood kernel against
 # high-precision references, across gamma/sigma from 1e-8 to 1e8.
 #
-# Responds to the 2026-08-18 audit, section 4: the branch switches now gate on
+# Certifies the branch dispatch: the switches gate on
 # the Cauchy-limit expansion parameter r = sigma^2/(ytil^2+gamma^2), and this
 # script certifies (a) the worst-case relative error of the dispatched score,
 # Hessian, and conditional moments per quantity and per gamma/sigma decade,
@@ -10,7 +10,7 @@
 # (d) Fisher-information convergence and the large-ratio limit
 #     I_sigma_sigma * gamma^4 / sigma^2 -> 1  (exactly: the Cauchy-limit
 #     score gives (1/pi) * integral (6u^2-2)^2/(1+u^2)^5 du = pi),
-# (e) the audit's specific failure cases.
+# (e) the recorded extreme-ratio failure cases of earlier revisions.
 # A threshold-tuning mode reports the minimax constants.
 #
 # High-precision reference: erfcx(w) in Complex{BigFloat} via Taylor series of
@@ -23,7 +23,7 @@
 #
 # Run:  julia --project=. examples/certify.jl          (certification, ~min)
 #       julia --project=. examples/certify.jl tune     (threshold scan)
-# Exit code is nonzero on any FAIL (audit section 8.5).
+# Exit code is nonzero on any FAIL.
 
 using VoigtInference, Printf
 
@@ -146,9 +146,8 @@ end
 function f64_tail(ỹ, σ, γ)
     s = V._score_tail(ỹ, σ, γ)
     H = V._hessian_tail(ỹ, σ, γ)
-    den = ỹ^2 + γ^2
-    cm = σ^2 * 2ỹ / den
-    cv = σ^2 * (1 + σ^2 * 2 * (ỹ^2 - γ^2) / den^2)
+    cm = σ^2 * s[1]                              # E[Z|y] = σ² s_μ (Tweedie)
+    cv = σ^2 * (1.0 + σ^2 * H[1])                # V(Z|y) = σ²(1 + σ² H_μμ)
     (s, H, cm, cv)
 end
 
@@ -162,7 +161,7 @@ end
 # then exactly 1 while the absolute error is ~r * blockscale). The normwise
 # metric is also the operationally relevant one: Newton steps and Wald
 # matrices are perturbed at the level of the block norm. This is the combined
-# relative/scale-aware criterion the audit's section 4.2 calls for; the
+# relative/scale-aware criterion that certification requires; the
 # certified claim is "every component is accurate to the stated bound TIMES
 # THE BLOCK'S LARGEST COMPONENT".
 function block_err(xs, ts)
@@ -174,15 +173,45 @@ end
 # evaluation grid
 # ------------------------------------------------------------------
 
+# walk from y0 to the first float where pred(y) == target (
+# a single nextfloat can land on the same side of the computed mask, so the
+# nominal threshold's neighbors were not the first actually-dispatched points)
+function first_where(pred, y0, target::Bool)
+    y = y0
+    step = max(abs(y0), 1.0) * 1e-16
+    while pred(y) != target
+        y += target ? step : -step
+        step *= 2
+        isfinite(y) || return NaN
+    end
+    # bisect back to the boundary float
+    lo, hi = target ? (y0, y) : (y, y0)
+    for _ in 1:200
+        mid = (lo + hi) / 2
+        (mid == lo || mid == hi) && break
+        if pred(mid) == target
+            target ? (hi = mid) : (lo = mid)
+        else
+            target ? (lo = mid) : (hi = mid)
+        end
+    end
+    return target ? hi : lo
+end
+
 "y-points for a given (sigma, gamma): center, core, transition, thresholds, tail."
 function ypoints(σ, γ)
     sc = sqrt(σ^2 + γ^2)
     ys = Float64[0.0, 0.3γ, γ, 2γ, 5γ, 20γ, 0.5sc, 2sc, 41γ, 100γ]
-    for rt in (5.0e-7, 6.25e-5)                     # r-threshold crossings
+    for rt in (1.0e-5, 5.0e-4, 1.0e-6, 1.0e-4, 1.0e-3, 1.0e-2)  # shipped + probe crossings
         arg = σ^2 / rt - γ^2
         if arg > 0
             yt = sqrt(arg)
-            push!(ys, prevfloat(yt), yt, nextfloat(yt))
+            pred = y -> σ^2 < rt * (y^2 + γ^2)      # the actual dispatch mask
+            y_in  = first_where(pred, yt, true)     # first dispatched float
+            y_out = first_where(pred, yt, false)    # last exact-branch float
+            for yy in (y_out, yt, y_in)
+                isfinite(yy) && push!(ys, yy)
+            end
         end
     end
     push!(ys, 500sc, 1e4 * sc, 1e8 * sc)
@@ -234,12 +263,12 @@ function certify(; verbose::Bool = true)
 end
 
 # ------------------------------------------------------------------
-# audit echo cases and Fisher checks
+# extreme-ratio regression cases and Fisher checks
 # ------------------------------------------------------------------
 
-function audit_cases()
+function regression_cases()
     ok = true
-    println("\nAudit §4.1 cases:")
+    println("\nExtreme-ratio regression cases:")
     for (σ, γ, y, what, truth) in (
             (1.0, 1e4, 0.0,    "s_σ",  -1.9999999000e-8),
             (1.0, 1e4, 1e4,    "s_σ",   9.99999965e-9),
@@ -302,8 +331,8 @@ function tune()
         push!(E[:score], (block_err(se, sref), block_err(st, sref)))
         push!(E[:hess], (block_err(He, Href), block_err(Ht, Href)))
     end
-    for (name, cands) in ((:score, [0.5e-7, 1e-7, 2e-7, 3.5e-7, 5e-7, 7.5e-7, 1e-6, 2e-6]),
-                          (:hess, [0.5e-5, 1e-5, 2e-5, 4e-5, 6.25e-5, 1e-4, 2.5e-4]))
+    for (name, cands) in ((:score, [1e-7, 1e-6, 1e-5, 1e-4, 5e-4, 1e-3, 3e-3, 1e-2]),
+                          (:hess, [1e-5, 1e-4, 5e-4, 1e-3, 3e-3, 1e-2, 3e-2]))
         println("  $name:")
         for rt in cands
             wc = 0.0
@@ -322,12 +351,12 @@ if "tune" in ARGS
     tune()
 else
     worst, negvar = certify()
-    ok_audit = audit_cases()
+    ok_regression = regression_cases()
     ok_fisher = fisher_checks()
     # acceptance: certified bounds (provisional targets; tighten after tuning)
     ok = worst["score"] < 2e-6 && worst["hessian"] < 3e-3 &&
          worst["condmean"] < 5e-6 && worst["condvar"] < 1e-8 &&
-         negvar == 0 && ok_audit && ok_fisher
+         negvar == 0 && ok_regression && ok_fisher
     println(ok ? "\nCERTIFY: PASS" : "\nCERTIFY: FAIL")
     exit(ok ? 0 : 1)
 end

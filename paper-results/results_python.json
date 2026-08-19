@@ -1,0 +1,100 @@
+{
+  "language": "python",
+  "versions": {
+    "python": "3.14.7",
+    "numpy": "2.5.2",
+    "scipy": "1.18.0"
+  },
+  "platform": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "processor": "arm"
+  },
+  "n_per_obs": 100000,
+  "primitive": {
+    "name": "scipy.special.wofz",
+    "ns_per_obs": 71.02453442605432,
+    "ns_per_obs_median": 71.08881751157563
+  },
+  "per_obs": {
+    "log-density": {
+      "ns_per_obs": 77.07860671871458,
+      "ns_per_obs_median": 77.18649078015005,
+      "ratio_to_density": 1.0
+    },
+    "analytic score": {
+      "ns_per_obs": 81.52690283410871,
+      "ns_per_obs_median": 81.92099300989261,
+      "ratio_to_density": 1.057711164028009
+    },
+    "analytic Hessian": {
+      "ns_per_obs": 95.97293266919084,
+      "ns_per_obs_median": 96.66012846327457,
+      "ratio_to_density": 1.2451306108766071
+    },
+    "fused ll+grad+hess": {
+      "ns_per_obs": 95.48953537327739,
+      "ns_per_obs_median": 95.77620192430913,
+      "ratio_to_density": 1.2388591262650919
+    },
+    "FD score (6 evals)": {
+      "ns_per_obs": 464.8470840184018,
+      "ns_per_obs_median": 465.66620899830014,
+      "ratio_to_density": 6.03081845673188
+    },
+    "FD Hessian (24 evals)": {
+      "ns_per_obs": 1866.4929148508236,
+      "ns_per_obs_median": 1873.8877098076046,
+      "ratio_to_density": 24.215446987285016
+    }
+  },
+  "mle": [
+    {
+      "n": 1000,
+      "seconds": 0.0023736669681966305,
+      "iterations": 5,
+      "faddeeva_passes": 6,
+      "seconds_per_iteration": 0.0004747333936393261,
+      "converged": true,
+      "mu": 0.48195168007321154,
+      "sigma": 0.9511623280312966,
+      "gamma": 0.3144146403116263,
+      "loglik": -1954.5199852446485
+    },
+    {
+      "n": 10000,
+      "seconds": 0.010003749979659915,
+      "iterations": 6,
+      "faddeeva_passes": 7,
+      "seconds_per_iteration": 0.0016672916632766526,
+      "converged": true,
+      "mu": 0.5041406479086928,
+      "sigma": 1.0000551534331186,
+      "gamma": 0.29331411860623036,
+      "loglik": -19602.850050430112
+    },
+    {
+      "n": 100000,
+      "seconds": 0.07548750005662441,
+      "iterations": 6,
+      "faddeeva_passes": 7,
+      "seconds_per_iteration": 0.012581250009437403,
+      "converged": true,
+      "mu": 0.4999761980005119,
+      "sigma": 1.0025570302199294,
+      "gamma": 0.29791793016155954,
+      "loglik": -196660.26903826714
+    }
+  ],
+  "fisher": {
+    "nodes": 400,
+    "seconds": 9.745513727690013e-05,
+    "seconds_median": 9.812951304313293e-05
+  },
+  "throughput": {
+    "n": 10000,
+    "fits": 217,
+    "seconds": 2.005138708045706,
+    "fits_per_sec": 108.22193952432222
+  }
+}

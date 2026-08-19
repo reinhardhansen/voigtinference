@@ -113,35 +113,41 @@ Faddeeva passes rather than around micro-optimising the arithmetic:
 No automatic differentiation, finite differences, numerical convolution, or pseudo-Voigt
 approximations are used anywhere.
 
-### Far-tail branches
+### Cauchy-limit branches
 
-The closed-form score and Hessian are algebraically exact but lose floating-point precision
-in the tail, where terms that agree to many digits are subtracted. Past the crossover the
-package switches to a Cauchy-limit expansion.
+The closed-form score and Hessian are algebraically exact but lose
+floating-point precision whenever the Gaussian component is a small
+perturbation of the Cauchy component. That happens deep in the tail *and*,
+less obviously, at any point when `gamma >> sigma` (the digits lost grow
+like `4 log10(gamma/sigma)` even at the line center). Both regimes are
+covered by one criterion: the package dispatches to Cauchy-limit expansions
+wherever the expansion parameter
 
-**The score and the Hessian need different switches.** The Hessian recursion forms
-`smu − ỹ·hmm` — a difference of two quantities of size `2/ỹ` whose value is of size `1/ỹ³` —
-so it loses digits far sooner than the score does. Measured against high-precision ground
-truth, the crossovers sit at
+    r = sigma^2 / ((y - mu)^2 + gamma^2)
 
-| quantity | switch | worst-case relative error |
-| --- | ---: | ---: |
-| score, conditional moments | `\|y − μ\| > 500 √(σ² + γ²)` | 2.0e-05 |
-| Hessian | `\|y − μ\| > 40 √(σ² + γ²)` | 8.6e-03 |
+is small, with thresholds `r < 1e-5` for the score and conditional moments
+and `r < 5e-4` for the Hessian (the Hessian recursion cancels harder, so it
+must switch earlier).
 
-Sharing one switch is not a marginal loss: with the score's threshold applied to the
-Hessian, the Hessian has **no correct digits at all** from about `100 √(σ² + γ²)` outward
-(relative error 1.9 at 100×, 4.0e+07 at 1000×). Individual far-tail Hessian entries are
-`O(1/ỹ²)` so this does not disturb a summed Hessian or the standard errors, but it makes
-`voigt_hessian` at a single tail point meaningless — and it is invisible unless you check
-against something better than double precision.
+**The branches are derivatives of one truncated log density**, carried to
+three expansion orders. This matters for inference, not just evaluation: a
+pointwise-accurate branch whose entries are not derivatives of a common
+objective violates the likelihood identities after integration -- a
+first-order branch gives `E[s_sigma] * gamma^4/sigma^3 -> 1/2` instead of
+zero and makes `-E[H]` indefinite at large `gamma/sigma`. The consistent
+construction keeps `E[s] = 0` and `E[ss'] = -E[H]` to the retained order
+(`tests/test_identities.py` verifies both by quadrature under the exact
+model), and its truncation error is `O(r^3)` pointwise.
 
-Both constants were chosen by minimising worst-case relative error over `|ỹ|/scale ∈ [1, 1e6]`
-across a spread of `(σ, γ)`. `tests/test_accuracy.py` verifies the resulting bounds, guards
-the split against regression, and checks that the reference itself is converged — the
-reference needs precision growing with `log|ỹ|` for the same reason the Hessian does, and a
-fixed 60 digits silently degrades past `1e5 √(σ² + γ²)` in a way that looks exactly like a
-broken expansion. Run the module as a script to print the crossover tables.
+The dispatched implementation is certified against high-precision
+references over `gamma/sigma` in `[1e-8, 1e8]`, including the first
+actually-dispatched float on each side of every threshold, with normwise
+worst-case errors of `2.0e-9` (score), `1.2e-5` (Hessian), and `~1e-11`
+(conditional moments, nonnegative variance everywhere); the naive formulas
+reach errors of order `1e16` on the same grid. The certification driver is
+`examples/certify.jl` in the Julia package; `bench/tailtable.py` reproduces
+the two-design table in the paper. The threshold constants are duplicated
+across four source locations and guarded by `check_constants.py` in CI.
 
 ## Tests
 

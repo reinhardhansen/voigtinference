@@ -41,6 +41,30 @@ end
     end
 end
 
+@testset "input contract" begin
+    # density permits each boundary limit but not both; the interior
+    # calculus rejects boundary or nonfinite widths; options are validated
+    @test voigt_pdf(0.5, 0.0, 0.0, 1.0) ≈ 1 / (π * 1.25)
+    @test voigt_pdf(0.5, 0.0, 1.0, 0.0) > 0
+    @test_throws DomainError voigt_pdf(0.0, 0.0, 0.0, 0.0)
+    @test_throws DomainError voigt_pdf(0.0, 0.0, -1.0, 1.0)
+    @test_throws DomainError voigt_pdf(0.0, 0.0, NaN, 1.0)
+    for f in (voigt_logpdf, voigt_score, voigt_hessian,
+              voigt_condmean, voigt_condvar)
+        @test_throws DomainError f(0.5, 0.0, 0.0, 1.0)
+        @test_throws DomainError f(0.5, 0.0, 1.0, 0.0)
+        @test_throws DomainError f(0.5, 0.0, 1.0, Inf)
+    end
+    @test_throws DomainError voigt_pdf_score(0.5, 0.0, 0.0, 1.0)
+    @test_throws DomainError voigt_loglik([0.1, 0.5], 0.0, 1.0, 0.0)
+    yc = rand_voigt(MersenneTwister(1), 200, 0.0, 1.0, 0.5)
+    @test_throws ArgumentError voigt_mle(yc; starts = 0)
+    @test_throws ArgumentError voigt_mle(yc; gtol = 0.0)
+    @test_throws ArgumentError voigt_mle(yc; maxiter = 0)
+    @test_throws ArgumentError voigt_mle(yc; nodes = 1)
+    @test_throws DomainError rand_voigt(MersenneTwister(1), 10, 0.0, -1.0, 1.0)
+end
+
 @testset "fused pdf+score identity" begin
     # voigt_pdf_score must be bit-identical to the separate calls, in both
     # the exact and the far-tail branch (large |ỹ| and large γ/σ)
@@ -86,6 +110,72 @@ end
     @test maximum(abs.(Matrix(ℐ) + EH)) < 0.05
 end
 
+@testset "likelihood identities of the dispatched derivatives" begin
+    # E[s] = 0 and E[ss'] = -E[H] under the exact model, verified by
+    # tangent-transformed quadrature with information-scale prescaling.
+    # Leading-order Cauchy-limit branches violate both after integration
+    # (E[s_sigma] gamma^4/sigma^3 -> 1/2; -E[H] indefinite); the shipped
+    # branches derive from one truncated log density and must not.
+    # Centering is feasible at every ratio; the identity and PSD checks stop
+    # at 1e4 because the sigma-sigma slot integrates a pointwise integrand
+    # ~(γ/σ)² larger than its expectation, so double-precision quadrature
+    # noise (~45 eps (γ/σ)²) swamps the identity beyond ~1e5 (established
+    # analytically there: the branches are derivatives of one expansion).
+    t, wq = V._gauss_legendre(4000)
+    σ = 1.0
+    for ratio in (10.0, 50.0, 1.0e2, 1.0e3, 1.0e4, 1.0e6, 1.0e8)
+        γ = ratio * σ
+        ys = γ .* tan.((π / 2) .* t)
+        dy = γ .* (π / 2) ./ cos.((π / 2) .* t) .^ 2
+        scale = (γ, γ * γ / σ, γ)
+        Es = zeros(3)
+        M = zeros(3, 3)
+        EH = zeros(3, 3)
+        for (yi, wi, di) in zip(ys, wq, dy)
+            f = voigt_pdf(yi, 0.0, σ, γ)
+            sc = voigt_score(yi, 0.0, σ, γ)
+            H = voigt_hessian(yi, 0.0, σ, γ)
+            wf = wi * f * di
+            for i in 1:3
+                Es[i] += wf * sc[i] * scale[i]
+                for j in i:3
+                    M[i, j] += wf * (sc[i] * sc[j] + H[i, j]) * scale[i] * scale[j]
+                    EH[i, j] += wf * H[i, j] * scale[i] * scale[j]
+                end
+            end
+        end
+        @test maximum(abs, Es) < 1e-3
+        if ratio <= 1.0e4
+            @test maximum(abs, M) < 1e-2
+            EHs = Symmetric(EH)
+            @test minimum(eigen(-Matrix(EHs)).values) > -1e-3
+        end
+    end
+
+    # independently computed high-precision reference points (sigma = 1); the
+    # previous leading-order branch returned +1.14e-8 / +4.56e-8 / 2.30e-6
+    @test abs(voigt_score(0.0, 0.0, 1.0, 1.0e4)[2] / -1.9999999000e-8 - 1) < 1e-6
+    @test abs(voigt_score(1.0e4, 0.0, 1.0, 1.0e4)[2] / 9.99999965e-9 - 1) < 1e-6
+    @test abs(voigt_score(1.0e5, 0.0, 1.0, 1.0e4)[2] / 5.86217038e-10 - 1) < 1e-6
+    @test abs(voigt_condmean(41.0e6, 0.0, 1.0, 1.0e6) / 4.87514863e-8 - 1) < 1e-6
+    @test abs(voigt_condvar(41.0e6, 0.0, 1.0, 1.0e6) - 1.0) < 1e-3
+
+    # the dispatched score differentiates the exact sample log likelihood
+    rng = MersenneTwister(5)
+    γ = 2.0e3
+    yy = γ .* tan.(π .* (rand(rng, 2000) .- 0.5))
+    θ = (0.1, 1.0, γ)
+    stot = sum(voigt_score(yi, θ...) for yi in yy)
+    for (i, h) in ((1, 1e-4), (2, 1e-5), (3, 1e-2 * γ))
+        tp = collect(θ); tp[i] += h
+        tm = collect(θ); tm[i] -= h
+        fd = (voigt_loglik(yy, tp...) - voigt_loglik(yy, tm...)) / (2h)
+        # FD-limited tolerance: the sigma direction differentiates a tiny
+        # signal riding on a log likelihood of magnitude ~1e4
+        @test abs(stot[i] - fd) / (abs(fd) + 1) < 1e-3
+    end
+end
+
 @testset "MLE recovery" begin
     rng = MersenneTwister(2026)
     μ0, σ0, γ0 = 0.5, 1.0, 0.3
@@ -100,7 +190,7 @@ end
     @test norm(g) < 1e-6
 end
 
-@testset "Phase B: boundaries, submodels, diagnostics" begin
+@testset "boundaries, submodels, diagnostics" begin
     # interior fit: full diagnostics
     rng = MersenneTwister(3)
     y = rand_voigt(rng, 4000, 0.5, 1.0, 0.4)

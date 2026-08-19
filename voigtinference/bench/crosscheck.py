@@ -34,7 +34,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 
 # The primary case plus the two width-ratio extremes: gamma/sigma ~ 1e4 puts
 # the CENTER of the profile in the Cauchy-limit branch (the regime of the
-# 2026-08-18 far-tail audit), gamma/sigma ~ 1e-4 approaches the Gaussian
+# regime of the extreme-ratio regression), gamma/sigma ~ 1e-4 approaches the Gaussian
 # limit.  The Fisher quadrature is compared for the primary case only (at
 # extreme width ratios the two node generators' last-ulp differences are
 # amplified by the integrand, which is a property of quadrature, not of the

@@ -1,0 +1,12 @@
+$ python3 examples/demo.py                     (voigtinference, 19 Aug 2026)
+Voigt sample: n = 5000, true (mu, sigma, gamma) = (0.5, 1.0, 0.3)
+
+Voigt MLE   n-iterations=7  converged=True  termination=gradient_converged  loglik=-9818.059090
+             estimate    std. error     obs. s.e.
+     mu      0.515466      0.018786      0.018790
+  sigma      1.014695      0.023145      0.023171
+  gamma      0.293235      0.017507      0.017510
+boundary submodels: loglik(Gaussian) = -20019.447246, loglik(Cauchy) = -10136.486406
+
+Faddeeva passes over the sample: 8 (7 Newton iterations)
+t-statistics against the truth: +0.82  +0.63  -0.39

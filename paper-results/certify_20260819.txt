@@ -1,0 +1,58 @@
+$ julia --project=. examples/certify.jl        (VoigtInference.jl, 19 Aug 2026)
+λ =    1e-08:  score  9.8e-12  hessian  1.4e-12  condmean  1.3e-12  condvar  1.1e-11
+λ =    3e-08:  score  9.8e-12  hessian  1.4e-12  condmean  1.0e-11  condvar  2.6e-11
+λ =    1e-07:  score  9.8e-12  hessian  1.2e-12  condmean  1.3e-12  condvar  2.6e-11
+λ =    3e-07:  score  9.8e-12  hessian  2.0e-12  condmean  1.3e-12  condvar  1.8e-11
+λ =    1e-06:  score  9.8e-12  hessian  2.0e-12  condmean  1.3e-12  condvar  2.6e-11
+λ =    3e-06:  score  4.1e-12  hessian  2.5e-12  condmean  1.0e-11  condvar  2.6e-11
+λ =    1e-05:  score  9.8e-12  hessian  1.3e-12  condmean  1.0e-11  condvar  1.1e-11
+λ =    3e-05:  score  4.1e-12  hessian  6.8e-13  condmean  1.3e-12  condvar  3.6e-12
+λ =    1e-04:  score  1.8e-11  hessian  2.3e-12  condmean  1.3e-12  condvar  1.1e-11
+λ =    3e-04:  score  6.1e-12  hessian  1.3e-12  condmean  1.8e-12  condvar  3.6e-12
+λ =    1e-03:  score  3.7e-12  hessian  1.2e-12  condmean  2.7e-12  condvar  3.6e-12
+λ =    3e-03:  score  4.6e-12  hessian  1.9e-12  condmean  2.6e-12  condvar  1.8e-11
+λ =    1e-02:  score  2.3e-12  hessian  1.7e-11  condmean  7.1e-12  condvar  1.1e-11
+λ =    3e-02:  score  2.6e-12  hessian  1.7e-10  condmean  3.9e-12  condvar  1.8e-11
+λ =    1e-01:  score  7.9e-12  hessian  1.7e-09  condmean  5.9e-12  condvar  1.4e-11
+λ =    3e-01:  score  9.1e-12  hessian  1.7e-08  condmean  9.6e-13  condvar  7.2e-12
+λ =    1e+00:  score  2.2e-12  hessian  1.7e-07  condmean  7.0e-13  condvar  1.8e-11
+λ =    3e+00:  score  1.2e-10  hessian  1.6e-06  condmean  9.4e-12  condvar  3.9e-11
+λ =    1e+01:  score  2.1e-10  hessian  1.2e-05  condmean  4.4e-12  condvar  3.6e-12
+λ =    3e+01:  score  2.9e-10  hessian  1.1e-05  condmean  7.2e-12  condvar  9.2e-12
+λ =    1e+02:  score  2.0e-09  hessian  4.5e-07  condmean  2.3e-11  condvar  1.5e-11
+λ =    3e+02:  score  5.7e-12  hessian  4.5e-09  condmean  1.5e-14  condvar  0.0e+00
+λ =    1e+03:  score  1.8e-14  hessian  4.5e-11  condmean  3.2e-16  condvar  0.0e+00
+λ =    3e+03:  score  2.1e-16  hessian  4.5e-13  condmean  2.1e-16  condvar  0.0e+00
+λ =    1e+04:  score  2.5e-16  hessian  4.5e-15  condmean  1.8e-16  condvar  0.0e+00
+λ =    3e+04:  score  2.7e-16  hessian  2.1e-16  condmean  2.7e-16  condvar  0.0e+00
+λ =    1e+05:  score  2.0e-16  hessian  2.6e-16  condmean  2.1e-16  condvar  0.0e+00
+λ =    3e+05:  score  1.7e-16  hessian  1.6e-16  condmean  2.1e-16  condvar  0.0e+00
+λ =    1e+06:  score  2.1e-16  hessian  2.0e-16  condmean  1.3e-16  condvar  0.0e+00
+λ =    3e+06:  score  2.1e-16  hessian  3.0e-16  condmean  2.2e-16  condvar  0.0e+00
+λ =    1e+07:  score  1.6e-16  hessian  2.1e-16  condmean  2.0e-16  condvar  0.0e+00
+λ =    3e+07:  score  2.6e-16  hessian  3.9e-16  condmean  2.6e-16  condvar  0.0e+00
+λ =    1e+08:  score  2.1e-16  hessian  2.5e-16  condmean  2.1e-16  condvar  0.0e+00
+
+Worst case over the whole grid:
+  score      1.97e-09   at (γ/σ = 1e+02, ỹ = 50)
+  hessian    1.17e-05   at (γ/σ = 1e+01, ỹ = 43.59)
+  condmean   2.33e-11   at (γ/σ = 1e+02, ỹ = 30)
+  condvar    3.94e-11   at (γ/σ = 3e+00, ỹ = 316.2)
+  negative conditional variances (reference nonnegative): 0
+
+Extreme-ratio regression cases:
+  (σ,γ,y)=(1,1e+04,0.0e+00) s_σ  = -2.000000e-08  (truth -2.000000e-08, rel 2.8e-15) PASS
+  (σ,γ,y)=(1,1e+04,1.0e+04) s_σ  = +1.000000e-08  (truth +1.000000e-08, rel 6.6e-16) PASS
+  (σ,γ,y)=(1,1e+04,1.0e+05) s_σ  = +5.862170e-10  (truth +5.862170e-10, rel 1.0e-10) PASS
+  (σ,γ,y)=(1,1e+06,4.1e+07) s_μ  = +4.875149e-08  (truth +4.875150e-08, rel 2.8e-07) PASS
+  (σ,γ,y)=(1,1e+06,4.1e+07) s_γ  = +9.988109e-07  (truth +9.988110e-07, rel 6.1e-08) PASS
+  Var(Z|y) at (1,1e6,100γ) = 1.000000  (truth ≈ 1) PASS
+
+Fisher information, large-ratio limit  I_σσ γ⁴/σ² → 1:
+  γ/σ =  1e+02: nodes 200..1600 → 0.9994, 0.9994, 0.9994, 0.9994  PASS
+  γ/σ =  1e+03: nodes 200..1600 → 1.0000, 1.0000, 1.0000, 1.0000  PASS
+  γ/σ =  1e+04: nodes 200..1600 → 1.0000, 1.0000, 1.0000, 1.0000  PASS
+
+CERTIFY: PASS
+(the "Audit §4.1 cases" heading of the run predates the neutral renaming to
+"Extreme-ratio regression cases"; content identical)

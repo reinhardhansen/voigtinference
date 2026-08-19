@@ -1,0 +1,20 @@
+$ julia --project=. examples/certify.jl tune   (VoigtInference.jl, 19 Aug 2026)
+Minimax scan (worst-case over the grid, per candidate threshold):
+  score:
+    r* = 1.000e-07  →  worst case 1.083e-06
+    r* = 1.000e-06  →  worst case 2.209e-07
+    r* = 1.000e-05  →  worst case 1.970e-09
+    r* = 1.000e-04  →  worst case 5.846e-09
+    r* = 5.000e-04  →  worst case 1.350e-07
+    r* = 1.000e-03  →  worst case 1.851e-06
+    r* = 3.000e-03  →  worst case 6.170e-06
+    r* = 1.000e-02  →  worst case 5.853e-04
+  hess:
+    r* = 1.000e-05  →  worst case 1.903e-02
+    r* = 1.000e-04  →  worst case 7.061e-05
+    r* = 5.000e-04  →  worst case 5.825e-06
+    r* = 1.000e-03  →  worst case 6.367e-05
+    r* = 3.000e-03  →  worst case 1.958e-04
+    r* = 1.000e-02  →  worst case 6.176e-03
+    r* = 3.000e-02  →  worst case 7.008e-03
+Adopted: r_s = 1.0e-5, r_h = 5.0e-4.

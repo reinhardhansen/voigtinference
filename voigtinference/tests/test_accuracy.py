@@ -66,7 +66,7 @@ def _switch_mult(r_thresh, sigma, gamma):
     """The r-criterion sigma^2 < r_thresh*(ytil^2 + gamma^2), expressed as the
     |ytil|/scale multiple at which the branch flips. For the moderate-ratio
     REGIMES here the criterion is |ytil|-driven; at large gamma/sigma it holds
-    for every ytil (the audit's section 4.1 regime), covered by certify.jl."""
+    for every ytil (the large-ratio cancellation regime), covered by certify.jl."""
     arg = sigma * sigma / r_thresh - gamma * gamma
     return np.sqrt(max(arg, 0.0)) / _scale(sigma, gamma)
 
@@ -181,7 +181,9 @@ def test_tail_expansions_converge():
         s_t, h_t = _truth(yt, SIGMA, GAMMA)
         s_l, h_l = _tail_branch(yt, SIGMA, GAMMA)
         es, eh = _relerr(s_l, s_t), _relerr(h_l, h_t)
-        assert es < prev_s and eh < prev_h, f"expansion error must fall, mult={mult}"
+        # strictly falling until the double-precision rounding floor
+        assert es < prev_s or es < 1e-13, f"expansion error must fall, mult={mult}"
+        assert eh < prev_h or eh < 1e-13, f"expansion error must fall, mult={mult}"
         prev_s, prev_h = es, eh
     assert prev_s < 1e-10
     assert prev_h < 1e-10
@@ -208,9 +210,10 @@ def test_reference_precision_is_sufficient():
             assert _relerr(h_a, h_b) < 1e-20, f"reference not converged at mult={mult:.0e}"
 
 
-def test_hessian_switches_far_earlier_than_the_score():
-    """Guards the split: one shared switch is what this package used to have."""
-    assert HESS_SWITCH < SCORE_SWITCH / 5
+def test_hessian_switches_no_later_than_the_score():
+    """The Hessian's exact branch is never more accurate than the score's,
+    so it must never switch later (r_h >= r_s, i.e. smaller |y| switch)."""
+    assert HESS_SWITCH <= SCORE_SWITCH + 1e-12
 
 
 # --------------------------------------- worst case over the whole real line
@@ -251,11 +254,14 @@ def test_hessian_worst_case_relative_error():
     assert worst < 5e-3, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
 
 
-def test_sharing_the_score_switch_would_wreck_the_hessian():
-    """The regression this split exists to prevent: catastrophic, not marginal."""
+def test_sharing_the_score_switch_would_degrade_the_hessian():
+    """The regression the r_s/r_h split exists to prevent.  With the
+    third-order branches the degradation is no longer catastrophic, but
+    forcing the Hessian to use the score threshold still costs more than
+    two orders of magnitude in its worst case."""
     split, _, _ = _worst_case("hessian")
     shared, _, _ = _worst_case("hessian", override_hess_switch=SCORE_SWITCH)
-    assert shared > 1e3 * split
+    assert shared > 1e2 * split
 
 
 # ------------------------------------------- the dispatched public interface

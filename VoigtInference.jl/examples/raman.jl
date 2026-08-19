@@ -3,13 +3,14 @@
 #
 # Data: the `raman` dataset (2048 points) from the CRAN package `voigt`
 # (Cannas & Piras), an excerpt of the red-ochre spectra of Pisu et al. (2025),
-# Spectrochim. Acta A 329. Export it once from R:
+# Spectrochim. Acta A 329. The data are GPL-2-licensed third-party material
+# and are NOT redistributed with this release. Acquire them once,
+# deterministically, with the companion script (requires R):
 #
-#   install.packages("voigt")
-#   library(voigt); data(raman)
-#   write.csv(raman, "raman.csv", row.names = FALSE)
+#   Rscript examples/get_raman.R
 #
-# and place raman.csv in examples/. We fit the fourth peak (rows 782:1097,
+# which downloads the exact CRAN archive (voigt_2.0.tar.gz), converts the
+# `raman` dataset to examples/raman.csv, and prints checksums. We fit the fourth peak (rows 782:1097,
 # following the package's documented example) with the intensity model
 #
 #   I(ν) = b + A · f(ν; μ, σ, γ),

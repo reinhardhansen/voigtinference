@@ -22,8 +22,8 @@ ROOT = pathlib.Path(__file__).resolve().parent
 if not (ROOT / "voigtinference").is_dir():        # staged in repo/ in the
     ROOT = pathlib.Path.cwd()                     # Drive tree; run from CPC/
 
-R_S = "5.0e-7"
-R_H = "6.25e-5"
+R_S = "1.0e-5"
+R_H = "5.0e-4"
 
 
 def numbers(pattern, path):
@@ -53,7 +53,7 @@ def main():
         ("voigtinference/bench/bench.jl",
          r"r_h\s*=\s*([0-9.e+-]+)", [R_H]),
         ("VoigtInference.jl/examples/certify.jl",
-         r"ypoints[\s\S]{0,200}?\(([0-9.e+-]+),\s*([0-9.e+-]+)\)", [R_S, R_H]),
+         r"for rt in \(([0-9.e+-]+),\s*([0-9.e+-]+)", [R_S, R_H]),
     ]
     ok = True
     for path, pattern, expected in checks:

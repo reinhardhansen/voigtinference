@@ -58,6 +58,8 @@ class VoigtMLEResult:
     loglik_cauchy: float = float("nan")
     gaussian_fit: tuple = (float("nan"), float("nan"))
     cauchy_fit: tuple = (float("nan"), float("nan"))
+    gaussian_se: tuple = (float("nan"), float("nan"))
+    cauchy_se: tuple = (float("nan"), float("nan"))
     starts: int = 1
     iterations: int = 0
     nfev: int = 0
@@ -243,6 +245,7 @@ def _newton_core(y, eta0, lb, ub, maxiter, gtol, verbose):
     it = 0
     eye = np.eye(3)
     g = np.full(3, np.nan)
+    blind = 0                # resolution-limited full steps taken on trust
 
     while it < maxiter:
         it += 1
@@ -284,30 +287,67 @@ def _newton_core(y, eta0, lb, ub, maxiter, gtol, verbose):
             break
 
         # projected backtracking line search: the Armijo condition is tested
-        # against the EXECUTED (clamped) step p, not the proposed t*delta
+        # against the EXECUTED (clamped) step p, not the proposed t*delta.
+        # Backtracking stops as soon as the predicted improvement 1e-4*t*g'p
+        # falls below the double-precision resolution of the average log
+        # likelihood: no floating-point value could then pass the Armijo
+        # test, so further trials would only burn Faddeeva passes.  (Near
+        # the optimum this stall previously cost up to 40
+        # extra passes per fit on some platforms and was then masked by a
+        # hard-coded pgnorm < 1e-4 fallback that silently replaced the
+        # requested gtol; both are removed.  A stalled fit reports
+        # termination "stalled_near_stationary" with converged=False and
+        # its projected gradient norm, and the caller decides.)
+        # When the Armijo margin 1e-4*t*g'p falls below the resolution of
+        # the average log likelihood, the sufficient-decrease comparison is
+        # uninformative: near the optimum this happens one step before the
+        # gradient tolerance is met.  In that regime the full Newton step is
+        # taken on trust (it is an ascent direction and cannot move ll by
+        # more than its resolution), the projected-gradient check at the top
+        # of the next iteration remains the sole arbiter of convergence, and
+        # the number of such resolution-limited steps is capped.
         t = 1.0
         improved = False
+        stalled = False
+        # resolution of the average log likelihood: machine epsilon scaled
+        # by its magnitude AND by the summation noise of an n-term total
+        # (grows like sqrt(n) in practice; too tight a slack rejects trusted
+        # steps at large n through pure rounding jitter)
+        eps_ll = np.finfo(float).eps * (abs(ll) + 1.0) * (16.0 + np.sqrt(n))
         for _ in range(40):
             eta_new = eta + t * delta
             eta_new[1] = min(max(eta_new[1], lb), ub)
             eta_new[2] = min(max(eta_new[2], lb), ub)
             p = eta_new - eta
+            if not np.any(p):
+                stalled = True                 # step underflowed entirely
+                break
             gp = float(g @ p)
             if gp > 0.0:
+                limited = 1e-4 * gp < eps_ll
+                if limited and blind >= 24:
+                    stalled = True             # trust budget exhausted
+                    break
                 ll_new, cache_new = loglik_only(
                     y, eta_new[0], np.exp(eta_new[1]), np.exp(eta_new[2])
                 )
                 nfev += 1
                 ll_new /= n
-                if np.isfinite(ll_new) and ll_new >= ll + 1e-4 * gp:
+                if np.isfinite(ll_new) and (
+                    ll_new >= ll + 1e-4 * gp
+                    or (limited and ll_new >= ll - 2.0 * eps_ll)
+                ):
                     eta, ll, cache = eta_new, ll_new, cache_new
                     improved = True
+                    blind += int(limited)
+                    break
+                if limited:
+                    stalled = True             # even the trusted step failed
                     break
             t *= 0.5
 
         if not improved:
-            converged = _projnorm(g, eta, lb, ub) < 1e-4
-            reason = "gradient_converged" if converged else "line_search_failed"
+            reason = "stalled_near_stationary" if stalled else "line_search_failed"
             break
 
         if verbose:
@@ -368,6 +408,14 @@ def voigt_mle(
         raise ValueError("need at least 3 observations")
     if not np.all(np.isfinite(y)):
         raise ValueError("data contain non-finite values")
+    if maxiter < 1:
+        raise ValueError("maxiter must be >= 1")
+    if not gtol > 0:
+        raise ValueError("gtol must be > 0")
+    if nodes < 2:
+        raise ValueError("nodes must be >= 2")
+    if starts < 1:
+        raise ValueError("starts must be >= 1 (capped at 7)")
 
     mu0, sigma0, gamma0 = _startvalues(y)
     # keep the log-widths in a sane range relative to the data scale; the true
@@ -397,17 +445,51 @@ def voigt_mle(
         nfev += res[7]
         if best is None or res[1] > best[1]:
             best = res
+
+    # boundary submodels (fitted before the flags: they feed the guard)
+    mg, sg, llg = _gaussian_fit(y)
+    mc, gc, llc, _ = _cauchy_fit(y)
+
+    # submodel-domination guard: the Voigt family nests both
+    # submodels, so a full-model candidate below either submodel likelihood
+    # is a failed local search.  Refit from submodel-informed starts; if the
+    # deficit persists, report it as the termination reason.
+    # tolerance scales with the log-likelihood magnitude: a fit clamped at
+    # the tiny-width bound sits legitimately a clamp-residual below the exact
+    # submodel likelihood (~1e-3 at n = 1e5), which is not a failed search
+    tol_dom = 1e-7 * (1.0 + abs(max(llg, llc)))
+    if n * best[1] < max(llg, llc) - tol_dom:
+        informed = [
+            np.array([mg, min(max(np.log(sg), lb), ub),
+                      min(max(np.log(1e-3 * sg), lb), ub)]),
+            np.array([mc, min(max(np.log(1e-3 * gc), lb), ub),
+                      min(max(np.log(gc), lb), ub)]),
+        ]
+        for eta0 in informed:
+            res = _newton_core(y, eta0, lb, ub, maxiter, gtol, verbose)
+            nfev += res[7]
+            if res[1] > best[1]:
+                best = res
+        if n * best[1] < max(llg, llc) - tol_dom:
+            best = best[:4] + ("submodel_dominates",) + best[5:]
     eta, ll, converged, it, reason, gnorm, pgnorm, _ = best
+    ll_total = float(n * ll)
 
     mu_hat = float(eta[0])
     sigma_hat = float(np.exp(eta[1]))
     gamma_hat = float(np.exp(eta[2]))
-    # boundary flags: clamp active OR width negligible relative to the other
+    # boundary flags: clamp active, OR width negligible relative to the other
     # width (the gradient in a log-width vanishes proportionally to the width,
     # so the optimiser can satisfy the gradient criterion at a tiny width
-    # without touching the literal clamp)
-    sigma_boundary = bool(eta[1] <= lb + 1e-10 or sigma_hat < 1e-6 * gamma_hat)
-    gamma_boundary = bool(eta[2] <= lb + 1e-10 or gamma_hat < 1e-6 * sigma_hat)
+    # without touching the literal clamp), OR likelihood evidence: a Voigt
+    # fit that is not strictly better than a nested boundary submodel is
+    # effectively that submodel, whatever the fitted width says (fixed
+    # width-ratio flags alone miss tolerance-limited near-boundary stops
+    # with meaningless Wald widths)
+    sigma_boundary = bool(eta[1] <= lb + 1e-10 or sigma_hat < 1e-6 * gamma_hat
+                          or ll_total <= llc + 1e-7)
+    gamma_boundary = bool(eta[2] <= lb + 1e-10 or gamma_hat < 1e-6 * sigma_hat
+                          or ll_total <= llg + 1e-7)
     upper_boundary = bool(eta[1] >= ub - 1e-10 or eta[2] >= ub - 1e-10)
     at_boundary = sigma_boundary or gamma_boundary or upper_boundary
 
@@ -440,9 +522,6 @@ def voigt_mle(
     except (np.linalg.LinAlgError, ValueError):
         pass
 
-    mg, sg, llg = _gaussian_fit(y)
-    mc, gc, llc, _ = _cauchy_fit(y)
-
     return VoigtMLEResult(
         mu=mu_hat,
         sigma=sigma_hat,
@@ -450,7 +529,7 @@ def voigt_mle(
         se=se,
         se_obs=se_obs,
         vcov=vcov,
-        loglik=float(n * ll),
+        loglik=ll_total,
         converged=converged,
         termination=reason,
         sigma_boundary=sigma_boundary,
@@ -464,6 +543,12 @@ def voigt_mle(
         loglik_cauchy=llc,
         gaussian_fit=(mg, sg),
         cauchy_fit=(mc, gc),
+        # closed-form submodel standard errors (valid inference for the
+        # nested model when the full fit is on that boundary): Gaussian
+        # (sg/sqrt(n), sg/sqrt(2n)); Cauchy expected info is diagonal with
+        # I(mu) = I(gamma) = n/(2 gamma^2)
+        gaussian_se=(sg / np.sqrt(n), sg / np.sqrt(2.0 * n)),
+        cauchy_se=(gc * np.sqrt(2.0 / n), gc * np.sqrt(2.0 / n)),
         starts=len(startlist),
         iterations=it,
         nfev=nfev,

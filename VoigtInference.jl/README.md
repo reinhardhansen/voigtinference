@@ -27,9 +27,9 @@ using VoigtInference, Random
 
 y = rand_voigt(MersenneTwister(1), 5_000, 0.5, 1.0, 0.3)
 
-r = voigt_mle(y)             # exact MLE with analytic Newton steps
+r = voigt_mle(y)             # safeguarded-Newton likelihood optimizer
 r.μ, r.σ, r.γ                # estimates
-r.se                         # exact asymptotic standard errors (expected information)
+r.se                         # asymptotic Wald standard errors (expected information)
 
 voigt_pdf(2.0, r.μ, r.σ, r.γ)
 voigt_score(2.0, r.μ, r.σ, r.γ)      # ∂ log f / ∂(μ, σ, γ)

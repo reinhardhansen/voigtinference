@@ -1,4 +1,4 @@
-"""Phase B diagnostics: boundary flags, suppressed Wald SEs, submodels,
+"""Boundary diagnostics: boundary flags, suppressed Wald SEs, submodels,
 termination reasons, multistart."""
 
 import numpy as np

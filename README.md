@@ -73,24 +73,31 @@ Tests: `julia --project=. -e 'using Pkg; Pkg.test()'` (from
 
 The Raman example uses the red-ochre spectrum distributed with the CRAN
 `voigt` package (GPL-2, Cannas & Piras; data of Pisu et al., Spectrochim.
-Acta A 329 (2025) 125581), which is **not** redistributed here; the script
-header explains how to fetch and convert it (no R required).
+Acta A 329 (2025) 125581), which is **not** redistributed here;
+`VoigtInference.jl/examples/get_raman.R` fetches the exact CRAN archive and
+converts it (a one-time step that requires R), printing checksums for
+provenance.
 
 ## Numerical robustness
 
 The exact score/Hessian formulas suffer catastrophic floating-point
-cancellation deep in the Lorentzian tail. Both implementations switch to
-Cauchy-limit expansions at `|y - mu| > 500 sqrt(sigma^2 + gamma^2)` for the
-score and conditional moments and at `40 sqrt(sigma^2 + gamma^2)` for the
-Hessian (which loses digits an order of magnitude sooner). The switches are
-validated against 256-/512-bit references in `bench/tailtable.py`; the naive
-formulas reach relative errors of order `1e47` where the packaged ones are at
-machine precision.
+cancellation deep in the Lorentzian tail and, at large `gamma/sigma`, even
+at the line center. Both implementations dispatch to third-order
+Cauchy-limit expansions wherever `r = sigma^2/((y-mu)^2 + gamma^2)` is
+small (`r < 1e-5` for the score and conditional moments, `r < 5e-4` for the
+Hessian). The branches are derivatives of one truncated log density, so the
+likelihood identities `E[s] = 0` and `E[ss'] = -E[H]` survive the dispatch;
+the implementation is certified against high-precision references over
+`gamma/sigma` in `[1e-8, 1e8]` (worst cases: score `2e-9`, Hessian `1.2e-5`),
+while the naive formulas reach relative errors of order `1e16` on the same
+grid (`bench/tailtable.py`, `examples/certify.jl`).
 
 The two implementations match association order, not just algebra; the
-cross-check (`bench/crosscheck.py` + `bench/crosscheck.jl`) asserts exact
-bitwise agreement and is the alarm that should fire if either side is
-"tidied."
+cross-check (`bench/crosscheck.py` + `bench/crosscheck.jl`) requires
+agreement within `1e-12` on the distributed grid and fails the build
+otherwise (in the authors' recorded environment every evaluation-level
+difference is exactly zero). It is the alarm that should fire if either
+side is "tidied."
 
 ## License
 

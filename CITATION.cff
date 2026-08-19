@@ -21,6 +21,9 @@ keywords:
   - Fisher information
   - line shape
   - spectroscopy
+# When the CPC software article is published, it becomes the preferred
+# citation for the software and the methods paper below moves to
+# `references:`.
 preferred-citation:
   type: article
   title: "Exact likelihood inference and robust filtering for Gauss-Cauchy convolution models"

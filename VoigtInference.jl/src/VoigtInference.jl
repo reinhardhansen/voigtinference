@@ -60,6 +60,29 @@ end
 const _SQRT2PI = sqrt(2π)
 const _SQRT2OVERPI = sqrt(2 / π)
 
+"width contract for the density: finite, nonnegative, not both zero"
+@inline function _check(σ, γ)
+    (isfinite(σ) && isfinite(γ)) ||
+        throw(DomainError((σ, γ), "σ and γ must be finite"))
+    σ < 0 && throw(DomainError(σ, "σ must be ≥ 0"))
+    γ < 0 && throw(DomainError(γ, "γ must be ≥ 0"))
+    (σ == 0 && γ == 0) &&
+        throw(DomainError((σ, γ), "σ and γ cannot both be 0 (degenerate model)"))
+    return nothing
+end
+
+"width contract for the interior likelihood calculus: strictly positive.
+The score, Hessian, and conditional-moment formulas are the interior
+calculus; the boundary submodels have their own calculus (see voigt_mle)."
+@inline function _check_interior(σ, γ)
+    (isfinite(σ) && isfinite(γ)) ||
+        throw(DomainError((σ, γ), "σ and γ must be finite"))
+    (σ > 0 && γ > 0) ||
+        throw(DomainError((σ, γ),
+              "σ and γ must be > 0 for the interior likelihood calculus"))
+    return nothing
+end
+
 # ------------------------------------------------------------------
 # Density and log-likelihood
 # ------------------------------------------------------------------
@@ -71,8 +94,7 @@ Voigt density f(y) = K(x,a)/(σ√(2π)). Boundary cases σ=0 (pure Lorentzian)
 and γ=0 (pure Gaussian) are handled by their limits.
 """
 function voigt_pdf(y::Real, μ::Real, σ::Real, γ::Real)
-    σ < 0 && throw(DomainError(σ, "σ must be ≥ 0"))
-    γ < 0 && throw(DomainError(γ, "γ must be ≥ 0"))
+    _check(σ, γ)
     if σ == 0                       # pure Lorentzian
         return γ / (π * ((y - μ)^2 + γ^2))
     elseif γ == 0                   # pure Gaussian
@@ -84,13 +106,16 @@ end
 
 "voigt_logpdf(y, μ, σ, γ): log of `voigt_pdf` (interior case σ, γ > 0)."
 function voigt_logpdf(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     K, _, _, _ = _KL(y, μ, σ, γ)
     return log(K) - log(σ) - 0.5 * log(2π)
 end
 
 "voigt_loglik(y, μ, σ, γ): sample log-likelihood Σᵢ log f(yᵢ)."
-voigt_loglik(y::AbstractVector, μ::Real, σ::Real, γ::Real) =
-    sum(voigt_logpdf(yi, μ, σ, γ) for yi in y)
+function voigt_loglik(y::AbstractVector, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
+    return sum(voigt_logpdf(yi, μ, σ, γ) for yi in y)
+end
 
 # ------------------------------------------------------------------
 # Score and Hessian  (Hansen & Tong 2026, in Faddeeva convention)
@@ -108,37 +133,112 @@ voigt_loglik(y::AbstractVector, μ::Real, σ::Real, γ::Real) =
 #   f(y) = c(ỹ) + (σ²/2)c″(ỹ) + O(σ⁴ c⁴ᵗʰ),   c = Cauchy(0,γ) density,
 # is accurate, with relative error O(r). Gating on r covers both failure
 # modes with one criterion; the earlier |ỹ|-based switch missed the
-# large-γ/σ center entirely (2026-08-18 audit, §4.1).
+# large-γ/σ center entirely.
 #
-# The Hessian recursion forms s_μ - ỹ H_μμ, a difference of two
-# quantities of size 2/ỹ whose value is of size 1/ỹ³, so its exact branch
-# loses digits sooner and switches to the expansion earlier (larger r).
-#
-# Minimax-tuned constants (examples/certify.jl tune, 18 Aug 2026): interior
-# optima on plateaus r_s ∈ [3.5e-7, 5e-7] and r_h ∈ [4e-5, 6.25e-5].
-# Certified normwise worst cases over γ/σ ∈ [1e-8, 1e8] (see certify.jl,
-# which also defines the metric): score ≤ ~5.4e-7, Hessian ≤ ~1.1e-3,
-# conditional moments ≤ ~2e-6 / ~1e-9.
-@inline _far_tail(ỹ, σ, γ)      = σ^2 < 5.0e-7 * (ỹ^2 + γ^2)   # score, moments
-@inline _far_tail_hess(ỹ, σ, γ) = σ^2 < 6.25e-5 * (ỹ^2 + γ^2)  # Hessian
+# The branches below carry three expansion orders and are derivatives of
+# one truncated log density, so their truncation error is O(r³) pointwise
+# and the likelihood identities hold after integration. The branch is
+# therefore MORE accurate than the exact formulas well before cancellation
+# becomes visible. The thresholds are the minimax optima from the
+# certify.jl tune scan (worst pointwise error: score ~2e-9 at r_s = 1e-5,
+# Hessian ~6e-6 at r_h = 5e-4), and the small exact zones also remove the
+# integrated information-identity violation that large exact-branch zones
+# caused at γ/σ ~ 50-100. Certified by
+# examples/certify.jl over γ/σ ∈ [1e-8, 1e8]; see its output for bounds.
+@inline _far_tail(ỹ, σ, γ)      = σ^2 < 1.0e-5 * (ỹ^2 + γ^2)   # score, moments
+@inline _far_tail_hess(ỹ, σ, γ) = σ^2 < 5.0e-4 * (ỹ^2 + γ^2)   # Hessian
 
+# Cauchy-limit branches. Every entry is the exact derivative of ONE
+# truncated expansion of the log density,
+#
+#     log f = log c + (σ²/2) A + (σ⁴/8) (B - A²) + σ⁶ (C/48 - AB/8 + A³/24),
+#
+# with c the Lorentzian density and A = c″/c, B = c⁗/c, C = c⁽⁶⁾/c. Deriving all entries
+# from the same truncated log density keeps the dispatched score centered
+# (E[s] = 0) and makes the dispatched Hessian its derivative, so the
+# integrated information identity E[ss′] = -E[H] holds to the retained
+# order. Leading-order formulas are pointwise accurate but violate these
+# identities after integration: the leading term cancels under the
+# expectation while the truncation error does not (E[σA] = σ³/(2γ⁴) ≠ 0;
+# E[A] gives the H_σσ curvature the wrong sign). The ratios w, v, rs2
+# lie in [0, 1] on the dispatch region, so
+# the evaluation cannot overflow. Expressions match the Python
+# implementation token for token (bit identity).
 @inline function _score_tail(ỹ, σ, γ)
-    den = ỹ^2 + γ^2
-    sμ = 2ỹ / den
-    sσ = σ * (6ỹ^2 - 2γ^2) / den^2
-    sγ = 1 / γ - 2γ / den
+    den = ỹ * ỹ + γ * γ
+    w = (ỹ * ỹ) / den
+    v = (γ * γ) / den
+    ur = ỹ / den
+    gr = γ / den
+    rs2 = (σ * σ) / den
+    sμ = ur * (2.0 + rs2 * (6.0 * w - 10.0 * v)
+                + rs2 * rs2 * (42.0 * w * w - 204.0 * w * v + 74.0 * v * v)
+                + rs2 * rs2 * rs2 * (144.0 * w * w * w - 2736.0 * w * w * v
+                                     + 3696.0 * w * v * v - 592.0 * v * v * v))
+    sσ = (σ / den) * ((6.0 * w - 2.0 * v)
+                            + rs2 * (42.0 * w * w - 108.0 * w * v
+                                     + 10.0 * v * v)
+                            + rs2 * rs2 * (144.0 * w * w * w - 1944.0 * w * w * v
+                                           + 1440.0 * w * v * v
+                                           - 56.0 * v * v * v))
+    sγ = (w - v) / γ + gr * rs2 * ((2.0 * v - 14.0 * w)
+                                         + rs2 * (-138.0 * w * w
+                                                  + 172.0 * w * v
+                                                  - 10.0 * v * v)
+                                         + rs2 * rs2 * (-936.0 * w * w * w
+                                                        + 4200.0 * w * w * v
+                                                        - 1976.0 * w * v * v
+                                                        + 56.0 * v * v * v))
     return sμ, sσ, sγ
 end
 
 @inline function _hessian_tail(ỹ, σ, γ)
-    den = ỹ^2 + γ^2
-    q = (6ỹ^2 - 2γ^2) / den^2
-    Hμμ = 2 * (ỹ^2 - γ^2) / den^2
-    Hγγ = -1 / γ^2 - 2 * (ỹ^2 - γ^2) / den^2
-    Hμγ = -4ỹ * γ / den^2
-    Hμσ = σ * (-12ỹ / den^2 + 4ỹ * (6ỹ^2 - 2γ^2) / den^3)
-    Hγσ = σ * (-4γ / den^2 - 4γ * (6ỹ^2 - 2γ^2) / den^3)
-    Hσσ = q
+    den = ỹ * ỹ + γ * γ
+    w = (ỹ * ỹ) / den
+    v = (γ * γ) / den
+    ur = ỹ / den
+    gr = γ / den
+    rs2 = (σ * σ) / den
+    Hμμ = ((2.0 * w - 2.0 * v)
+           + rs2 * (18.0 * w * w - 68.0 * w * v + 10.0 * v * v)
+           + rs2 * rs2 * (210.0 * w * w * w - 1638.0 * w * w * v
+                          + 1278.0 * w * v * v - 74.0 * v * v * v)
+           + rs2 * rs2 * rs2 * (1008.0 * w * w * w * w - 25632.0 * w * w * w * v
+                                + 54336.0 * w * w * v * v
+                                - 18784.0 * w * v * v * v + 592.0 * v * v * v * v)) / den
+    Hμσ = (σ / den) * ur * ((12.0 * w - 20.0 * v)
+                                + rs2 * (168.0 * w * w - 816.0 * w * v
+                                         + 296.0 * v * v)
+                                + rs2 * rs2 * (864.0 * w * w * w
+                                               - 16416.0 * w * w * v
+                                               + 22176.0 * w * v * v
+                                               - 3552.0 * v * v * v))
+    Hμγ = ur * gr * (-4.0 + rs2 * (40.0 * v - 56.0 * w)
+                     + rs2 * rs2 * (-828.0 * w * w + 1928.0 * w * v
+                                    - 444.0 * v * v)
+                     + rs2 * rs2 * rs2 * (-7488.0 * w * w * w
+                                          + 47616.0 * w * w * v
+                                          - 40512.0 * w * v * v
+                                          + 4736.0 * v * v * v))
+    Hσσ = ((6.0 * w - 2.0 * v)
+           + rs2 * (126.0 * w * w - 324.0 * w * v + 30.0 * v * v)
+           + rs2 * rs2 * (720.0 * w * w * w - 9720.0 * w * w * v
+                          + 7200.0 * w * v * v - 280.0 * v * v * v)) / den
+    Hγσ = (σ / den) * gr * ((4.0 * v - 28.0 * w)
+                                + rs2 * (-552.0 * w * w + 688.0 * w * v
+                                         - 40.0 * v * v)
+                                + rs2 * rs2 * (-5616.0 * w * w * w
+                                               + 25200.0 * w * w * v
+                                               - 11856.0 * w * v * v
+                                               + 336.0 * v * v * v))
+    Hγγ = ((v - 4.0 * w)
+           + rs2 * (-14.0 * w * w + 76.0 * w * v - 6.0 * v * v)
+           + rs2 * rs2 * (-138.0 * w * w * w + 1758.0 * w * w * v
+                          - 1254.0 * w * v * v + 50.0 * v * v * v)
+           + rs2 * rs2 * rs2 * (-936.0 * w * w * w * w + 24768.0 * w * w * w * v
+                                - 56080.0 * w * w * v * v
+                                + 18176.0 * w * v * v * v - 392.0 * v * v * v * v)) / den -
+          (w * w) / (γ * γ)
     return Hμμ, Hμσ, Hμγ, Hσσ, Hγσ, Hγγ
 end
 
@@ -154,6 +254,7 @@ Score ∂ log f(y;θ)/∂θ, θ = (μ, σ, γ):
 with ỹ = y - μ.
 """
 function voigt_score(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     ỹ = y - μ
     if _far_tail(ỹ, σ, γ)
         sμ, sσ, sγ = _score_tail(ỹ, σ, γ)
@@ -176,6 +277,7 @@ primitive for least-squares Jacobians of the lineshape, ∂f/∂θ = f sθ, as
 used by `examples/raman.jl`.
 """
 function voigt_pdf_score(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     ỹ = y - μ
     if _far_tail(ỹ, σ, γ)
         K, _, _, _ = _KL(y, μ, σ, γ)
@@ -197,6 +299,7 @@ and L/K -- no additional special-function evaluations. Parameter order
 (μ, σ, γ).
 """
 function voigt_hessian(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     ỹ = y - μ
     if _far_tail_hess(ỹ, σ, γ)
         Hμμ, Hμσ, Hμγ, Hσσ, Hγσ, Hγγ = _hessian_tail(ỹ, σ, γ)
@@ -236,9 +339,11 @@ so extreme deviations are attributed to the Lorentzian component. The
 conditional mean of the Lorentzian component is E[X | Y = y] = γ L/K.
 """
 function voigt_condmean(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     ỹ = y - μ
     if _far_tail(ỹ, σ, γ)                    # E[Z|y] = σ² s_μ (Tweedie)
-        return σ^2 * 2ỹ / (ỹ^2 + γ^2)
+        sμ, _, _ = _score_tail(ỹ, σ, γ)
+        return σ^2 * sμ
     end
     K, L, _, _ = _KL(y, μ, σ, γ)
     return ỹ - γ * L / K
@@ -251,9 +356,11 @@ V(Z | Y = y) = √(2/π) σγ/K - γ² (1 + (L/K)²). Equals σ² at the extrema
 the conditional mean; → σ² as |y - μ| → ∞.
 """
 function voigt_condvar(y::Real, μ::Real, σ::Real, γ::Real)
+    _check_interior(σ, γ)
     ỹ = y - μ
     if _far_tail(ỹ, σ, γ)                    # V(Z|y) = σ²(1 + σ² H_μμ)
-        return σ^2 * (1 + σ^2 * 2 * (ỹ^2 - γ^2) / (ỹ^2 + γ^2)^2)
+        Hμμ = first(_hessian_tail(ỹ, σ, γ))
+        return σ^2 * (1.0 + σ^2 * Hμμ)
     end
     K, L, _, _ = _KL(y, μ, σ, γ)
     return _SQRT2OVERPI * σ * γ / K - γ^2 * (1 + (L / K)^2)
@@ -347,8 +454,8 @@ function _loglik_grad_hess(y, μ, σ, γ)
     logconst = log(σ) + 0.5 * log(2π)
     g2 = γ * γ
     # branch gating on r = σ²/(ỹ²+γ²): Cauchy-limit branch where r < threshold
-    r_s = 5.0e-7                       # score switch   (matches _far_tail)
-    r_h = 6.25e-5                      # Hessian switch (matches _far_tail_hess)
+    r_s = 1.0e-5                       # score switch   (matches _far_tail)
+    r_h = 5.0e-4                       # Hessian switch (matches _far_tail_hess)
     @inbounds for yi in y
         ỹ = yi - μ
         ỹ2 = ỹ * ỹ
@@ -367,21 +474,10 @@ function _loglik_grad_hess(y, μ, σ, γ)
         hgs = -(sγ + γ * hgg - ỹ * hmg) / σ
         hss = -(sσ + γ * hgs - ỹ * hms) / σ
         if s2 < r_s * (ỹ2 + g2)                        # Cauchy-limit score
-            den = ỹ2 + γ * γ
-            sμ = 2 * ỹ / den
-            sσ = σ * (6 * ỹ2 - 2 * γ^2) / den^2
-            sγ = 1 / γ - 2 * γ / den
+            sμ, sσ, sγ = _score_tail(ỹ, σ, γ)
         end
         if s2 < r_h * (ỹ2 + g2)                        # Cauchy-limit Hessian
-            den = ỹ2 + γ * γ
-            d = 2 * (ỹ2 - γ^2) / den^2
-            q = (6 * ỹ2 - 2 * γ^2) / den^2
-            hmm = d
-            hgg = -1 / γ^2 - d
-            hmg = -4 * ỹ * γ / den^2
-            hms = σ * (-12 * ỹ / den^2 + 4 * ỹ * (6 * ỹ2 - 2 * γ^2) / den^3)
-            hgs = σ * (-4 * γ / den^2 - 4 * γ * (6 * ỹ2 - 2 * γ^2) / den^3)
-            hss = q
+            hmm, hms, hmg, hss, hgs, hgg = _hessian_tail(ỹ, σ, γ)
         end
         gμ += sμ; gσ += sσ; gγ += sγ
         hμμ += hmm; hμσ += hms; hμγ += hmg
@@ -406,7 +502,7 @@ function _avg_grad_hess(y, η)
 end
 
 # ------------------------------------------------------------------
-# Boundary submodels (likelihood-based boundary diagnosis; audit S5.1/S5.3)
+# Boundary submodels (likelihood-based boundary diagnosis)
 # ------------------------------------------------------------------
 
 "Gaussian-submodel MLE (the gamma = 0 boundary): closed form. Returns (mu, sigma, loglik)."
@@ -507,6 +603,7 @@ function _newton_core(y, η0, lb, ub; maxiter, gtol, verbose)
     reason = :max_iterations
     iter = 0
     g = zeros(3)
+    blind = 0                # resolution-limited full steps taken on trust
     while iter < maxiter
         iter += 1
         g, H = _avg_grad_hess(y, η)
@@ -540,28 +637,64 @@ function _newton_core(y, η0, lb, ub; maxiter, gtol, verbose)
         end
         # projected backtracking line search: the Armijo condition is tested
         # against the EXECUTED (clamped) step p, not the proposed t*Δ
-        # (audit S5.2)
+        # Backtracking stops as soon as the predicted
+        # improvement 1e-4*t*g'p falls below the double-precision resolution
+        # of the average log likelihood: no floating-point value could then
+        # pass the Armijo test, so further trials only burn Faddeeva passes.
+        # (The stall previously cost up to 40 extra passes
+        # and was masked by a hard-coded pgnorm < 1e-4 fallback that
+        # silently replaced the requested gtol; both are removed. A stalled
+        # fit reports :stalled_near_stationary with converged = false and
+        # its projected gradient norm, and the caller decides.)
+        # When the Armijo margin 1e-4*t*g'p falls below the resolution of
+        # the average log likelihood, the sufficient-decrease comparison is
+        # uninformative: near the optimum this happens one step before the
+        # gradient tolerance is met. In that regime the full Newton step is
+        # taken on trust (it is an ascent direction and cannot move ll by
+        # more than its resolution), the projected-gradient check at the top
+        # of the next iteration remains the sole arbiter of convergence, and
+        # the number of such resolution-limited steps is capped.
         t = 1.0
         improved = false
+        stalled = false
+        # resolution of the average log likelihood: machine epsilon scaled
+        # by its magnitude AND by the summation noise of an n-term total
+        # (grows like sqrt(n) in practice; too tight a slack rejects trusted
+        # steps at large n through pure rounding jitter)
+        eps_ll = eps(Float64) * (abs(ll) + 1.0) * (16.0 + sqrt(length(y)))
         for _ in 1:40
             ηc = η .+ t .* Δ
             ηc[2] = clamp(ηc[2], lb, ub)
             ηc[3] = clamp(ηc[3], lb, ub)
             p = ηc .- η
+            if all(iszero, p)
+                stalled = true                 # step underflowed entirely
+                break
+            end
             gp = dot(g, p)
             if gp > 0
+                limited = 1e-4 * gp < eps_ll
+                if limited && blind ≥ 24
+                    stalled = true             # trust budget exhausted
+                    break
+                end
                 llc = _avg_loglik(y, ηc)
-                if isfinite(llc) && llc ≥ ll + 1e-4 * gp
+                if isfinite(llc) && (llc ≥ ll + 1e-4 * gp ||
+                                     (limited && llc ≥ ll - 2.0 * eps_ll))
                     η, ll = ηc, llc
                     improved = true
+                    blind += limited ? 1 : 0
+                    break
+                end
+                if limited
+                    stalled = true             # even the trusted step failed
                     break
                 end
             end
             t /= 2
         end
         if !improved
-            converged = _projnorm(g, η, lb, ub) < 1e-4
-            reason = converged ? :gradient_converged : :line_search_failed
+            reason = stalled ? :stalled_near_stationary : :line_search_failed
             break
         end
         verbose && println("iter $iter  loglik $(length(y)*ll)  |g| $(norm(g))")
@@ -617,6 +750,10 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
     n = length(y)
     n ≥ 3 || throw(ArgumentError("need at least 3 observations"))
     all(isfinite, y) || throw(ArgumentError("data contain non-finite values"))
+    maxiter ≥ 1 || throw(ArgumentError("maxiter must be ≥ 1"))
+    gtol > 0 || throw(ArgumentError("gtol must be > 0"))
+    nodes ≥ 2 || throw(ArgumentError("nodes must be ≥ 2"))
+    starts ≥ 1 || throw(ArgumentError("starts must be ≥ 1 (capped at 7)"))
     μ0, σ0, γ0 = _startvalues(y)
     s0 = max(σ0, γ0)
     lb, ub = log(1e-8 * s0), log(1e8 * s0)
@@ -636,18 +773,47 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
         res = _newton_core(y, η0, lb, ub; maxiter, gtol, verbose)
         (best === nothing || res[2] > best[2]) && (best = res)
     end
+
+    # boundary submodels (fitted before the flags: they feed the guard)
+    μg, σg, llg = _gaussian_fit(y)
+    μc, γc, llc, _ = _cauchy_fit(y)
+
+    # submodel-domination guard: the Voigt family nests both
+    # submodels, so a full-model candidate below either submodel likelihood
+    # is a failed local search. Refit from submodel-informed starts; if the
+    # deficit persists, report it as the termination reason.
+    # tolerance scales with the log-likelihood magnitude: a fit clamped at
+    # the tiny-width bound sits legitimately a clamp-residual below the exact
+    # submodel likelihood (~1e-3 at n = 1e5), which is not a failed search
+    tol_dom = 1e-7 * (1.0 + abs(max(llg, llc)))
+    if n * best[2] < max(llg, llc) - tol_dom
+        informed = ([μg, clamp(log(σg), lb, ub), clamp(log(1e-3 * σg), lb, ub)],
+                    [μc, clamp(log(1e-3 * γc), lb, ub), clamp(log(γc), lb, ub)])
+        for η0 in informed
+            res = _newton_core(y, η0, lb, ub; maxiter, gtol, verbose)
+            res[2] > best[2] && (best = res)
+        end
+        if n * best[2] < max(llg, llc) - tol_dom
+            best = (best[1], best[2], best[3], best[4], :submodel_dominates,
+                    best[6], best[7])
+        end
+    end
     η, ll, converged, iter, reason, gnorm, pgnorm = best
+    ll_total = n * ll
     μ̂, σ̂, γ̂ = η[1], exp(η[2]), exp(η[3])
-    # boundary flags: clamp active OR width negligible relative to the other
+    # boundary flags: clamp active, OR width negligible relative to the other
     # width (the gradient in a log-width vanishes proportionally to the width,
     # so the optimizer can satisfy the gradient criterion at a tiny width
-    # without touching the literal clamp; audit §5.3)
-    sigma_boundary = η[2] ≤ lb + 1e-10 || σ̂ < 1e-6 * γ̂
-    gamma_boundary = η[3] ≤ lb + 1e-10 || γ̂ < 1e-6 * σ̂
+    # without touching the literal clamp), OR likelihood
+    # evidence: a Voigt fit that is not strictly better than a nested
+    # boundary submodel is effectively that submodel, whatever the fitted
+    # width says
+    sigma_boundary = η[2] ≤ lb + 1e-10 || σ̂ < 1e-6 * γ̂ || ll_total ≤ llc + 1e-7
+    gamma_boundary = η[3] ≤ lb + 1e-10 || γ̂ < 1e-6 * σ̂ || ll_total ≤ llg + 1e-7
     upper_boundary = η[2] ≥ ub - 1e-10 || η[3] ≥ ub - 1e-10
     at_boundary = sigma_boundary || gamma_boundary || upper_boundary
     # Wald standard errors require a positive-definite information matrix and
-    # an interior estimate; otherwise NaN plus diagnostics (audit S5.4) — a
+    # an interior estimate; otherwise NaN plus diagnostics — a
     # clipped zero would misrepresent an invalid covariance as certainty
     se = fill(NaN, 3)
     vcov = fill(NaN, 3, 3)
@@ -672,10 +838,8 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
         end
     catch
     end
-    μg, σg, llg = _gaussian_fit(y)
-    μc, γc, llc, _ = _cauchy_fit(y)
     return (μ = μ̂, σ = σ̂, γ = γ̂, se = se, se_obs = se_obs, vcov = vcov,
-            loglik = n * ll, converged = converged, termination = reason,
+            loglik = ll_total, converged = converged, termination = reason,
             sigma_boundary = sigma_boundary, gamma_boundary = gamma_boundary,
             upper_boundary = upper_boundary,
             gradient_norm = gnorm, projected_gradient_norm = pgnorm,
@@ -683,6 +847,12 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
             observed_info_posdef = observed_pd,
             loglik_gaussian = llg, loglik_cauchy = llc,
             gaussian_fit = (μ = μg, σ = σg), cauchy_fit = (μ = μc, γ = γc),
+            # closed-form submodel standard errors (valid inference for the
+            # nested model when the full fit is on that boundary): Gaussian
+            # (σg/√n, σg/√(2n)); Cauchy expected info is diagonal with
+            # I(μ) = I(γ) = n/(2γ²)
+            gaussian_se = (σg / sqrt(n), σg / sqrt(2.0 * n)),
+            cauchy_se = (γc * sqrt(2.0 / n), γc * sqrt(2.0 / n)),
             starts = length(startlist), iterations = iter)
 end
 
