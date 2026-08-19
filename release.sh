@@ -19,9 +19,14 @@ git diff --quiet && git diff --cached --quiet || {
 echo "== 1/6 constants guard =="
 python3 check_constants.py
 
-echo "== 2/6 Python tests =="
-python3 -m pip install -q -e "voigtinference[test]"
-python3 -m pytest voigtinference/tests -q
+echo "== 2/6 Python tests (ephemeral venv) =="
+rm -rf .release-venv
+python3 -m venv .release-venv
+# shellcheck disable=SC1091
+source .release-venv/bin/activate
+python -m pip install -q --upgrade pip
+python -m pip install -q -e "voigtinference[test]"
+python -m pytest voigtinference/tests -q
 
 echo "== 3/6 Julia tests =="
 ( cd VoigtInference.jl && julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()' )
@@ -30,14 +35,17 @@ echo "== 4/6 numerical certification =="
 ( cd VoigtInference.jl && julia --project=. examples/certify.jl )
 
 echo "== 5/6 Python build (wheel + sdist) =="
-python3 -m pip install -q build
-python3 -m build voigtinference --outdir dist/
+python -m pip install -q build
+python -m build voigtinference --outdir dist/
 
 echo "== 6/6 archives from the tag =="
 NAME="voigtinference-${TAG#v}"
 git archive --format=zip    --prefix="$NAME/" -o "dist/$NAME.zip"    "$TAG"
 git archive --format=tar.gz --prefix="$NAME/" -o "dist/$NAME.tar.gz" "$TAG"
 ( cd dist && shasum -a 256 * > SHA256SUMS && cat SHA256SUMS )
+
+deactivate
+rm -rf .release-venv
 
 echo
 echo "Release artifacts in dist/ — submit dist/$NAME.zip"
