@@ -202,12 +202,14 @@ end
     @test r.loglik > r.loglik_gaussian
     @test r.loglik > r.loglik_cauchy
 
-    # Submodel-true data: on the boundary the local parameter is the width
-    # (γ) or its square (σ²), so the MLE sits at an interior estimate of
-    # order n^(-1/2) or n^(-1/4) in about half of all samples (half-normal
-    # boundary asymptotics). The reliable diagnostic is the submodel
-    # likelihood comparison; the flag fires only when the fit is numerically
-    # the submodel.
+    # Submodel-true data: at the Cauchy boundary the local parameter is
+    # τ = σ², so σ̂ sits at an interior value of order n^(-1/4) in about
+    # half of all samples (one-sided boundary asymptotics); at the Gaussian
+    # boundary the γ-score has infinite Fisher information, no standard
+    # rate is claimed, and empirically γ̂ also often sits at a small
+    # interior value. The reliable diagnostic is the submodel likelihood
+    # comparison; the flag fires only when the fit is numerically the
+    # submodel.
 
     # pure Gaussian data
     rng = MersenneTwister(11)
@@ -236,4 +238,30 @@ end
     @test r4.starts == 4
     @test r4.loglik ≥ r1.loglik - 1e-8
     @test_throws ArgumentError voigt_mle([1.0, NaN, 2.0])
+end
+
+@testset "closed-family boundary LR" begin
+    # boundary_lr is a likelihood ratio against the CLOSED family (the
+    # full likelihood is the maximum of the interior and both submodel
+    # fits), so it is nonnegative for every sample. The raw interior-only
+    # difference 2(ℓ_int - ℓ_sub) can be negative near a boundary by a
+    # clamp residual; this testset is the regression guard against ever
+    # reverting to it.
+    gens = (rng -> randn(rng, 150),                              # Gaussian null
+            rng -> tan.(π .* (rand(rng, 150) .- 0.5)),           # Cauchy null
+            rng -> rand_voigt(rng, 150, 0.0, 1.0, 0.02))         # near-boundary
+    for (g, gen) in enumerate(gens)
+        nzero_g = 0
+        for s in 1:25
+            y = gen(MersenneTwister(18_500_902 + 97 * g + s))
+            r = voigt_mle(y)
+            lrg, lrc = boundary_lr(r)
+            @test lrg ≥ 0.0 && isfinite(lrg)
+            @test lrc ≥ 0.0 && isfinite(lrc)
+            nzero_g += lrg == 0.0
+        end
+        # Gaussian null: the closed-family maximum is usually the Gaussian
+        # fit itself, so the LR_G null distribution has an atom at zero
+        g == 1 && @test nzero_g ≥ 1
+    end
 end

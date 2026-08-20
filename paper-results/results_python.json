@@ -13,48 +13,48 @@
   "n_per_obs": 100000,
   "primitive": {
     "name": "scipy.special.wofz",
-    "ns_per_obs": 71.65236121650335,
-    "ns_per_obs_median": 72.20794196297048
+    "ns_per_obs": 71.94696691037868,
+    "ns_per_obs_median": 72.34799030223203
   },
   "per_obs": {
     "log-density": {
-      "ns_per_obs": 78.57624999375949,
-      "ns_per_obs_median": 78.78487793214876,
+      "ns_per_obs": 78.39027548118705,
+      "ns_per_obs_median": 78.5955645316731,
       "ratio_to_density": 1.0
     },
     "analytic score": {
-      "ns_per_obs": 82.65817535896625,
-      "ns_per_obs_median": 82.82387932232612,
-      "ratio_to_density": 1.0519485896251215
+      "ns_per_obs": 83.1378593133634,
+      "ns_per_obs_median": 83.30255034299374,
+      "ratio_to_density": 1.0605634283466159
     },
     "analytic Hessian": {
-      "ns_per_obs": 98.30430261385828,
-      "ns_per_obs_median": 98.75836956780404,
-      "ratio_to_density": 1.251068899593269
+      "ns_per_obs": 97.64404180459678,
+      "ns_per_obs_median": 97.87448339629918,
+      "ratio_to_density": 1.2456142194324913
     },
     "fused ll+grad+hess": {
-      "ns_per_obs": 96.2807749863714,
-      "ns_per_obs_median": 96.80015000049025,
-      "ratio_to_density": 1.22531649186641
+      "ns_per_obs": 97.0081000123173,
+      "ns_per_obs_median": 97.70863319281489,
+      "ratio_to_density": 1.237501710726841
     },
     "FD score (6 evals)": {
-      "ns_per_obs": 467.91304205544293,
-      "ns_per_obs_median": 469.15616700425744,
-      "ratio_to_density": 5.954891485564716
+      "ns_per_obs": 470.51704197656363,
+      "ns_per_obs_median": 471.7020419193432,
+      "ratio_to_density": 6.00223738325149
     },
     "FD Hessian (24 evals)": {
-      "ns_per_obs": 1901.1129147838801,
-      "ns_per_obs_median": 1906.4579153200611,
-      "ratio_to_density": 24.194497891345872
+      "ns_per_obs": 1893.1666697608307,
+      "ns_per_obs_median": 1894.4289546925575,
+      "ratio_to_density": 24.150529617862784
     }
   },
   "mle": [
     {
       "n": 1000,
-      "seconds": 0.0022127500269562006,
+      "seconds": 0.0022804579930379987,
       "iterations": 5,
       "faddeeva_passes": 6,
-      "seconds_per_iteration": 0.00044255000539124013,
+      "seconds_per_iteration": 0.00045609159860759974,
       "converged": true,
       "mu": 0.4819516800732109,
       "sigma": 0.9511623280313122,
@@ -63,10 +63,10 @@
     },
     {
       "n": 10000,
-      "seconds": 0.009605042054317892,
+      "seconds": 0.009614291950128973,
       "iterations": 6,
       "faddeeva_passes": 7,
-      "seconds_per_iteration": 0.0016008403423863153,
+      "seconds_per_iteration": 0.001602381991688162,
       "converged": true,
       "mu": 0.504140647908693,
       "sigma": 1.0000551534331115,
@@ -75,10 +75,10 @@
     },
     {
       "n": 100000,
-      "seconds": 0.07931958406697959,
+      "seconds": 0.07908183301333338,
       "iterations": 6,
       "faddeeva_passes": 7,
-      "seconds_per_iteration": 0.01321993067782993,
+      "seconds_per_iteration": 0.01318030550222223,
       "converged": true,
       "mu": 0.4999761980005119,
       "sigma": 1.0025570302199263,
@@ -88,13 +88,13 @@
   ],
   "fisher": {
     "nodes": 400,
-    "seconds": 9.720776731366296e-05,
-    "seconds_median": 9.798803131543362e-05
+    "seconds": 9.907445469527387e-05,
+    "seconds_median": 9.937841563073924e-05
   },
   "throughput": {
     "n": 10000,
-    "fits": 216,
-    "seconds": 2.008903875015676,
-    "fits_per_sec": 107.52132179461026
+    "fits": 207,
+    "seconds": 2.0055294999619946,
+    "fits_per_sec": 103.21463733339385
   }
 }

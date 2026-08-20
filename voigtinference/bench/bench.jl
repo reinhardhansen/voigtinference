@@ -140,8 +140,11 @@ function fd_hessian_sum(y, mu, sg, gm, h = 1e-4)
     return s
 end
 
-# What the shipped package costs today: voigt_score and voigt_hessian each call
-# _KL, so this is THREE Faddeeva evaluations per observation.
+# The separate PUBLIC routines: voigt_logpdf, voigt_score and voigt_hessian
+# each make their own Faddeeva evaluation, so this loop costs THREE passes
+# per observation. (The Julia package's optimizer does NOT do this: its
+# internal kernel is fused like fused_one_eval below; this variant is timed
+# as the reference point for what fusion buys.)
 function ll_score_hess_public(y, mu, sg, gm)
     ll = 0.0
     g = zeros(3)
@@ -156,7 +159,8 @@ end
 
 # The like-for-like counterpart of voigtinference.loglik_grad_hess: the
 # log-likelihood, score sum and Hessian sum from ONE Faddeeva evaluation per
-# observation.  This is the routine to backport into VoigtInference.jl.
+# observation, mirroring the fused kernel inside VoigtInference.jl's
+# optimizer.
 #
 # The far-tail branch is deliberately omitted here: the benchmark sample has no
 # far-tail points, and including the switch would time a branch that never

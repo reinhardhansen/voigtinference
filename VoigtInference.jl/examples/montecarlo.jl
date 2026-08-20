@@ -6,22 +6,28 @@
 # diagnostic accounting: convergence and termination reasons, boundary
 # flags for σ and γ separately, positive definiteness of both information
 # matrices, the valid-SE share, and the share of samples in which a
-# likelihood-ratio test at the CALIBRATED finite-sample 5% cutoff does NOT
-# reject the boundary submodel. The two boundaries differ: in
-# τ = σ² the Cauchy-boundary score is square-integrable, so Self-Liang
-# one-sided asymptotics apply and the cutoff approaches the ½χ²₀ + ½χ²₁
-# value 2.706; at the Gaussian boundary the γ-score has infinite Fisher
-# information and no such theory holds. Both statistics are location-scale
-# PIVOTAL under their nulls, so the exact finite-sample cutoffs depend only
-# on n and are calibrated once per n by simulation (boundary_lr.jl, which
-# also prints the true size of the naive 2.706 rule). The same boundary
+# CLOSED-FAMILY boundary likelihood-ratio test (VoigtInference.boundary_lr:
+# LR = max(0, 2(max(ℓ_int, ℓ_G, ℓ_C) - ℓ_sub)), nonnegative by
+# construction) at the calibrated finite-sample cutoff does NOT reject the
+# boundary submodel. The two boundaries differ: in τ = σ² the
+# Cauchy-boundary score is square-integrable, so Self-Liang one-sided
+# asymptotics apply and the cutoff approaches the ½χ²₀ + ½χ²₁ value 2.706;
+# at the Gaussian boundary the γ-score has infinite Fisher information, no
+# such theory holds, and the null LR distribution carries a large atom at
+# zero, so the calibrated rule is a level-at-most-5% rule. Both statistics
+# are location-scale PIVOTAL under their nulls, so the exact finite-sample
+# cutoffs depend only on n and are calibrated once per n by simulation
+# (boundary_lr.jl, which prints atom shares, objective-deficit and
+# termination diagnostics, and the true size of the naive 2.706 rule) and
+# then size-validated on independent replications. The same boundary
 # geometry is why the width MLE frequently sits at a small interior value
 # in submodel-true samples (for σ provably of order n^(-1/4), via τ = σ²;
 # for γ no standard rate applies), so the flags alone understate submodel
 # adequacy.
 #
 # Seeds are fixed integers, a deterministic function of the design and
-# replication indices (hash() is not stable across Julia versions).
+# replication indices (hash() is not stable across Julia versions), based
+# at SEEDBASE = 18500902, Woldemar Voigt's birthday (2 September 1850).
 # Replications are embarrassingly parallel and each seeds its own generator,
 # so the output is bit-identical for ANY thread count.
 #
@@ -65,8 +71,9 @@ function run_design(λ, n, seed, cutg, cutc)
         pdeA[r] = res.expected_info_posdef
         pdoA[r] = res.observed_info_posdef
         termA[r] = res.termination
-        lrgA[r] = 2 * (res.loglik - res.loglik_gaussian) ≤ cutg
-        lrcA[r] = 2 * (res.loglik - res.loglik_cauchy)  ≤ cutc
+        lrg, lrc = boundary_lr(res)        # closed-family LR, nonnegative
+        lrgA[r] = lrg ≤ cutg
+        lrcA[r] = lrc ≤ cutc
         for j in 1:3
             if isfinite(res.se[j]) && res.se[j] > 0
                 sevalid[r, j] = true
@@ -96,6 +103,8 @@ function main()
     println("covC conditions on valid standard errors.\n")
     cutg, cutc = calibrate_boundary_cutoffs(collect(NS); starts = STARTS)
     println()
+    validate_boundary_cutoffs(collect(NS), cutg, cutc; starts = STARTS)
+    println()
     @printf("%5s %6s | %8s %8s %5s %5s | %8s %8s %5s %5s | %8s %8s %5s %5s\n",
             "λ", "n", "bias(μ)", "rmse(μ)", "covU", "covC",
             "bias(σ)", "rmse(σ)", "covU", "covC",
@@ -105,7 +114,8 @@ function main()
     rowsA = String[]; rowsB = String[]; diaglines = String[]
     pct(x) = 100 * x / REPS
     for (li, λ) in enumerate(LAMBDAS), (ni, n) in enumerate(NS)
-        seed = 2026_000 + 100 * li + ni
+        seed = SEEDBASE + 100 * li + ni    # design block, disjoint from
+                                           # calibration/validation blocks
         b, rm, cvu, cvc, d = run_design(λ, n, seed, cutg[n], cutc[n])
         @printf("%5.2f %6d | %8.4f %8.4f %5.3f %5.3f | %8.4f %8.4f %5.3f %5.3f | %8.4f %8.4f %5.3f %5.3f\n",
                 λ, n, b[1], rm[1], cvu[1], cvc[1], b[2], rm[2], cvu[2], cvc[2],
@@ -134,13 +144,17 @@ function main()
 
 Notes: 'bdry σ/γ' are the shares of samples in which the corresponding width
 was estimated on (or effectively on) its boundary — the Cauchy or Gaussian
-component undetected. 'LR keeps' is the share in which the boundary
-likelihood-ratio test at the CALIBRATED finite-sample 5% cutoff (printed
-above; pivotal, so it depends only on n) does not reject the submodel; near
-the boundary this exceeds the flag shares because the width MLE frequently
-sits at a small interior value in submodel-true samples. The
-Cauchy-side cutoff approaches 2.706 (Self-Liang in τ = σ²); the Gaussian
-side is nonregular and its cutoff is a genuine finite-sample quantity.
+component undetected. 'LR keeps' is the share in which the CLOSED-FAMILY
+boundary likelihood-ratio test (boundary_lr; nonnegative by construction)
+at the calibrated finite-sample cutoff (printed above; pivotal, so it
+depends only on n; approximately level 5%, and conservative where the
+null's zero atom absorbs the 95% quantile) does not reject the submodel;
+near the boundary this
+exceeds the flag shares because the width MLE frequently sits at a small
+interior value in submodel-true samples. The Cauchy-side cutoff approaches
+2.706 (Self-Liang in τ = σ²); the Gaussian side is nonregular and its
+cutoff is a genuine finite-sample quantity, size-validated above on
+independent replications.
 
 LaTeX rows, Table A (λ, n, then bias/RMSE/covU/covC for μ, σ, γ):
 """)

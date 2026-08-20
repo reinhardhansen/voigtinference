@@ -57,9 +57,29 @@ jobs:
         with:
           project: VoigtInference.jl
 
+  cross-language:
+    # enforces the README's cross-validation claim: the Python and Julia
+    # implementations must agree within 1e-12 on the shared grid, and the
+    # MLE paths must cross-check at the three reference theta cases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1"
+      - name: Install Python package
+        run: python -m pip install -e voigtinference
+      - name: Instantiate Julia package
+        run: julia --project=VoigtInference.jl -e 'using Pkg; Pkg.instantiate()'
+      - name: Cross-language check (1e-12 tolerance)
+        run: bash voigtinference/bench/run_bench.sh --cross
+
   constants-guard:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Far-tail switch constants agree at all four sites
+      - name: Far-tail switch constants agree at all guarded sites
         run: python check_constants.py

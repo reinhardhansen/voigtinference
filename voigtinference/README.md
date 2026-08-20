@@ -110,8 +110,17 @@ Faddeeva passes rather than around micro-optimising the arithmetic:
   primitive for least-squares Jacobians of the lineshape (`df/dtheta = f * s_theta`),
   used by `examples/lmfit_voigt_jacobian.py`.
 
-No automatic differentiation, finite differences, numerical convolution, or pseudo-Voigt
-approximations are used anywhere.
+Within this package's model — the normalized, constant-width Voigt
+distribution — no automatic differentiation, finite differences, numerical
+convolution, or pseudo-Voigt approximations are used. (More general line-shape
+problems, e.g. energy-dependent widths, truncated or relativistic profiles, or
+instrument-response convolutions beyond the Gaussian, are out of scope and may
+still require numerical convolution.)
+
+The `examples/` directory (`demo.py`, `minuit_fit.py`,
+`lmfit_voigt_jacobian.py`) ships in the source repository and repository
+archives, not inside the wheel/sdist; the `examples` extra installs their
+dependencies (`pip install "voigtinference[examples]"`).
 
 ### Cauchy-limit branches
 

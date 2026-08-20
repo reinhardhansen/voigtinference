@@ -31,10 +31,10 @@ from .core import (
     voigt_score,
 )
 from .fisher import voigt_fisher
-from .mle import VoigtMLEResult, voigt_mle
+from .mle import VoigtMLEResult, boundary_lr, voigt_mle
 from .simulate import rand_voigt
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "faddeeva",
@@ -48,6 +48,7 @@ __all__ = [
     "voigt_condvar",
     "voigt_fisher",
     "voigt_mle",
+    "boundary_lr",
     "VoigtMLEResult",
     "rand_voigt",
     "loglik_grad_hess",

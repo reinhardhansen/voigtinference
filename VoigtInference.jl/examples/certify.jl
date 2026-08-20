@@ -353,9 +353,13 @@ else
     worst, negvar = certify()
     ok_regression = regression_cases()
     ok_fisher = fisher_checks()
-    # acceptance: certified bounds (provisional targets; tighten after tuning)
-    ok = worst["score"] < 2e-6 && worst["hessian"] < 3e-3 &&
-         worst["condmean"] < 5e-6 && worst["condvar"] < 1e-8 &&
+    # acceptance thresholds track the advertised envelope (recorded worst
+    # cases: score 1.41e-10, Hessian 6.35e-7, condmean 1.6e-12, condvar
+    # 6.2e-12) with a modest cross-platform margin, so a silent regression
+    # of the branches or the exact paths FAILS certification rather than
+    # passing under loose provisional targets
+    ok = worst["score"] < 1e-8 && worst["hessian"] < 1e-5 &&
+         worst["condmean"] < 1e-9 && worst["condvar"] < 1e-9 &&
          negvar == 0 && ok_regression && ok_fisher
     println(ok ? "\nCERTIFY: PASS" : "\nCERTIFY: FAIL")
     exit(ok ? 0 : 1)

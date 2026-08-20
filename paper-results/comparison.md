@@ -9,10 +9,10 @@ This is the floor. It is not a language difference but a difference between two 
 
 | implementation | ns/obs |
 | --- | ---: |
-| Python — `scipy.special.wofz` | 71.7 |
-| Julia — `SpecialFunctions.erfcx` | 85.3 |
+| Python — `scipy.special.wofz` | 71.9 |
+| Julia — `SpecialFunctions.erfcx` | 85.1 |
 
-Julia / Python = **1.19x**
+Julia / Python = **1.18x**
 
 ## 2. Per-observation cost, and the ratio to the density
 
@@ -20,13 +20,13 @@ The **ratio** column is the language-independent quantity and the one the paper 
 
 | task | Python ns/obs | Python ratio | Julia ns/obs | Julia ratio | Julia/Python |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| log-density | 78.6 | 1.00x | 96.4 | 1.00x | 1.23x |
-| analytic score | 82.7 | 1.05x | 99.8 | 1.04x | 1.21x |
-| analytic Hessian | 98.3 | 1.25x | 175.2 | 1.82x | 1.78x |
-| fused ll+grad+hess | 96.3 | 1.23x | 96.6 | 1.00x | 1.00x |
-| FD score (6 evals) | 467.9 | 5.95x | 550.6 | 5.71x | 1.18x |
-| FD Hessian (24 evals) | 1901.1 | 24.19x | 2090.8 | 21.68x | 1.10x |
-| ll+score+hess (3 evals) | -- | --x | 361.0 | 3.74x | --x |
+| log-density | 78.4 | 1.00x | 97.0 | 1.00x | 1.24x |
+| analytic score | 83.1 | 1.06x | 98.3 | 1.01x | 1.18x |
+| analytic Hessian | 97.6 | 1.25x | 171.5 | 1.77x | 1.76x |
+| fused ll+grad+hess | 97.0 | 1.24x | 97.2 | 1.00x | 1.00x |
+| FD score (6 evals) | 470.5 | 6.00x | 558.6 | 5.76x | 1.19x |
+| FD Hessian (24 evals) | 1893.2 | 24.15x | 2127.8 | 21.94x | 1.12x |
+| ll+score+hess (3 evals) | -- | --x | 358.3 | 3.69x | --x |
 
 ## 3. End-to-end maximum likelihood
 
@@ -34,9 +34,9 @@ Same data, same starting values, same tolerance. Compare the iteration counts be
 
 | n | Python s | its | passes | Julia s | its | Julia/Python |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1000 | 0.0022 | 5 | 6 | 0.0013 | 5 | 0.61x |
-| 10000 | 0.0096 | 6 | 7 | 0.0142 | 6 | 1.48x |
-| 100000 | 0.0793 | 6 | 7 | 0.1440 | 6 | 1.82x |
+| 1000 | 0.0023 | 5 | 6 | 0.0014 | 5 | 0.59x |
+| 10000 | 0.0096 | 6 | 7 | 0.0145 | 6 | 1.51x |
+| 100000 | 0.0791 | 6 | 7 | 0.1458 | 6 | 1.84x |
 
 `passes` counts Faddeeva evaluations over the whole sample. The Python implementation fuses the gradient and Hessian into one pass and reuses the line search's evaluation at the accepted step, so an accepted Newton iteration costs one pass there and two in Julia (the accepted trial's log-likelihood plus the fused gradient/Hessian pass); both use the fused per-point kernel.
 
@@ -53,4 +53,4 @@ Same data, same starting values, same tolerance. Compare the iteration counts be
 | quantity | Python | Julia |
 | --- | ---: | ---: |
 | Fisher information, 400 nodes (ms) | 0.10 | 0.07 |
-| fits/s at n = 10000 | 107.5 | 67.9 |
+| fits/s at n = 10000 | 103.2 | 67.8 |

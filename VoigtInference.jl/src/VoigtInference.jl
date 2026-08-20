@@ -26,7 +26,7 @@ using LinearAlgebra: Diagonal, Symmetric, SymTridiagonal, eigen, cholesky,
                      diag, dot, norm, isposdef, I
 
 export faddeeva, voigt_pdf, voigt_pdf_score, voigt_logpdf, voigt_loglik,
-       voigt_score, voigt_hessian, voigt_fisher, voigt_mle,
+       voigt_score, voigt_hessian, voigt_fisher, voigt_mle, boundary_lr,
        voigt_condmean, voigt_condvar, rand_voigt
 
 # ------------------------------------------------------------------
@@ -145,6 +145,11 @@ end
 # integrated information-identity violation that large exact-branch zones
 # caused at γ/σ ~ 50-100. Certified by
 # examples/certify.jl over γ/σ ∈ [1e-8, 1e8]; see its output for bounds.
+# Validated dynamic range: γ/σ ∈ [1e-8, 1e8], |ỹ| up to 1e8 × the profile
+# scale. Far outside it (magnitudes beyond ~1e150) the branch criterion's
+# ỹ² + γ² overflows and the derivative routines return non-finite values
+# rather than silently dispatching; keep inputs within representable
+# squares.
 @inline _far_tail(ỹ, σ, γ)      = σ^2 < 1.0e-4 * (ỹ^2 + γ^2)   # score, moments
 @inline _far_tail_hess(ỹ, σ, γ) = σ^2 < 5.0e-4 * (ỹ^2 + γ^2)   # Hessian
 
@@ -397,6 +402,11 @@ matrix equality ℐ(θ) = -E[H]; by symmetry ℐ is block diagonal
 (ℐ_μσ = ℐ_μγ = 0).
 """
 function voigt_fisher(μ::Real, σ::Real, γ::Real; nodes::Int = 400)
+    (isfinite(μ) && isfinite(σ) && isfinite(γ)) ||
+        throw(ArgumentError("μ, σ, γ must be finite"))
+    (σ > 0 && γ > 0) ||
+        throw(ArgumentError("σ and γ must be > 0 for the Fisher information"))
+    nodes ≥ 2 || throw(ArgumentError("nodes must be ≥ 2"))
     t, wq = _gauss_legendre_cached(nodes)
     scale = σ + γ
     ℐ = zeros(3, 3)
@@ -699,6 +709,19 @@ function _newton_core(y, η0, lb, ub; maxiter, gtol, verbose)
         end
         verbose && println("iter $iter  loglik $(length(y)*ll)  |g| $(norm(g))")
     end
+    if reason == :max_iterations
+        # the final permitted iteration ACCEPTED a step, so the loop exited
+        # before evaluating derivatives at the returned point: the stored
+        # gradient describes the previous iterate. Evaluate the returned
+        # point once and reapply the requested convergence criterion, so
+        # the reported diagnostics and the convergence verdict belong to
+        # the parameters actually returned.
+        g, _ = _avg_grad_hess(y, η)
+        if all(isfinite, g) && _projnorm(g, η, lb, ub) < gtol
+            converged = true
+            reason = :gradient_converged
+        end
+    end
     return η, ll, converged, iter, reason, norm(g), _projnorm(g, η, lb, ub)
 end
 
@@ -753,7 +776,8 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
     maxiter ≥ 1 || throw(ArgumentError("maxiter must be ≥ 1"))
     gtol > 0 || throw(ArgumentError("gtol must be > 0"))
     nodes ≥ 2 || throw(ArgumentError("nodes must be ≥ 2"))
-    starts ≥ 1 || throw(ArgumentError("starts must be ≥ 1 (capped at 7)"))
+    1 ≤ starts ≤ 7 || throw(ArgumentError(
+        "starts must be an integer in 1..7 (7 deterministic starting values exist)"))
     μ0, σ0, γ0 = _startvalues(y)
     s0 = max(σ0, γ0)
     lb, ub = log(1e-8 * s0), log(1e8 * s0)
@@ -776,7 +800,7 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
 
     # boundary submodels (fitted before the flags: they feed the guard)
     μg, σg, llg = _gaussian_fit(y)
-    μc, γc, llc, _ = _cauchy_fit(y)
+    μc, γc, llc, cauchy_conv = _cauchy_fit(y)
 
     # submodel-domination guard: the Voigt family nests both
     # submodels, so a full-model candidate below either submodel likelihood
@@ -786,7 +810,16 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
     # the tiny-width bound sits legitimately a clamp-residual below the exact
     # submodel likelihood (~1e-3 at n = 1e5), which is not a failed search
     tol_dom = 1e-7 * (1.0 + abs(max(llg, llc)))
-    if n * best[2] < max(llg, llc) - tol_dom
+    # boundary-aware refinement: ANY candidate within 4 log-likelihood units
+    # of the better submodel (not only outright deficits) is refit from two
+    # submodel-informed starts (nuisance parameters at the submodel fit,
+    # vanishing other width) followed by full joint Newton refinement. This
+    # resolves small genuine interior improvements near the boundaries --
+    # exactly what the calibrated boundary likelihood-ratio statistics are
+    # made of; the optimizer's objective resolution (~eps*|ll|*(16+sqrt n))
+    # is orders of magnitude below the calibrated critical values. A deficit
+    # persisting beyond tol_dom is reported as the termination reason.
+    if n * best[2] < max(llg, llc) + 4.0
         informed = ([μg, clamp(log(σg), lb, ub), clamp(log(1e-3 * σg), lb, ub)],
                     [μc, clamp(log(1e-3 * γc), lb, ub), clamp(log(γc), lb, ub)])
         for η0 in informed
@@ -802,8 +835,9 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
     ll_total = n * ll
     μ̂, σ̂, γ̂ = η[1], exp(η[2]), exp(η[3])
     # boundary flags: clamp active, OR width negligible relative to the other
-    # width (the gradient in a log-width vanishes proportionally to the width,
-    # so the optimizer can satisfy the gradient criterion at a tiny width
+    # width (the log-width gradient vanishes with the width — like γ for the
+    # Lorentzian width and like σ² for the Gaussian width, via τ = σ² — so
+    # the optimizer can satisfy the gradient criterion at a tiny width
     # without touching the literal clamp), OR likelihood
     # evidence: a Voigt fit that is not strictly better than a nested
     # boundary submodel is effectively that submodel, whatever the fitted
@@ -847,6 +881,7 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
             observed_info_posdef = observed_pd,
             loglik_gaussian = llg, loglik_cauchy = llc,
             gaussian_fit = (μ = μg, σ = σg), cauchy_fit = (μ = μc, γ = γc),
+            cauchy_fit_converged = cauchy_conv,
             # closed-form submodel standard errors (valid inference for the
             # nested model when the full fit is on that boundary): Gaussian
             # (σg/√n, σg/√(2n)); Cauchy expected info is diagonal with
@@ -854,6 +889,34 @@ function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
             gaussian_se = (σg / sqrt(n), σg / sqrt(2.0 * n)),
             cauchy_se = (γc * sqrt(2.0 / n), γc * sqrt(2.0 / n)),
             starts = length(startlist), iterations = iter)
+end
+
+# ------------------------------------------------------------------
+# Boundary likelihood-ratio statistics (closed family)
+# ------------------------------------------------------------------
+
+"""
+    boundary_lr(res) -> (lr_gaussian, lr_cauchy)
+
+Boundary likelihood-ratio statistics against the CLOSED Voigt family.
+The closed family includes the γ = 0 (Gaussian) and σ = 0 (Cauchy)
+boundary submodels, so the full-model likelihood is the maximum of the
+interior candidate and both submodel likelihoods, and each statistic is
+nonnegative by construction:
+
+    LR_sub = max(0, 2 (max(ℓ_interior, ℓ_G, ℓ_C) - ℓ_sub)).
+
+The closed-family maximum is what makes the statistic a likelihood
+ratio; the outer clamp only absorbs the last-ulp roundoff of the max.
+A raw difference `2(res.loglik - res.loglik_gaussian)` is NOT a valid
+LR: near a boundary the interior candidate legitimately sits a
+clamp-residual below the exact submodel likelihood, so the raw
+difference can be negative by far more than roundoff.
+"""
+function boundary_lr(res)
+    llfull = max(res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    return (max(0.0, 2 * (llfull - res.loglik_gaussian)),
+            max(0.0, 2 * (llfull - res.loglik_cauchy)))
 end
 
 # ------------------------------------------------------------------
@@ -867,8 +930,13 @@ Draw `n` iid variates from 𝒱(μ, σ, γ) by exact convolution:
 Y = μ + σ N(0,1) + γ tan(π(U - 1/2)).
 """
 function rand_voigt(rng, n::Int, μ::Real, σ::Real, γ::Real)
+    n < 0 && throw(ArgumentError("n must be nonnegative"))
+    (isfinite(μ) && isfinite(σ) && isfinite(γ)) ||
+        throw(ArgumentError("μ, σ, γ must be finite"))
     σ < 0 && throw(DomainError(σ, "σ must be ≥ 0"))
     γ < 0 && throw(DomainError(γ, "γ must be ≥ 0"))
+    σ == 0 && γ == 0 &&
+        throw(ArgumentError("σ and γ cannot both be 0 (degenerate model)"))
     return μ .+ σ .* randn(rng, n) .+ γ .* tan.(π .* (rand(rng, n) .- 0.5))
 end
 

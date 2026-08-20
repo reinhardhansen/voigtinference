@@ -17,10 +17,16 @@ def rand_voigt(n, mu, sigma, gamma, rng=None):
     rng : None, int, or numpy.random.Generator
         Seed or generator.  ``None`` uses fresh entropy.
     """
+    if not isinstance(n, (int, np.integer)) or isinstance(n, bool) or n < 0:
+        raise ValueError("n must be a nonnegative integer")
+    if not (np.isfinite(mu) and np.isfinite(sigma) and np.isfinite(gamma)):
+        raise ValueError("mu, sigma, gamma must be finite")
     if sigma < 0.0:
         raise ValueError("sigma must be >= 0")
     if gamma < 0.0:
         raise ValueError("gamma must be >= 0")
+    if sigma == 0.0 and gamma == 0.0:
+        raise ValueError("sigma and gamma cannot both be 0 (degenerate model)")
     if not isinstance(rng, np.random.Generator):
         rng = np.random.default_rng(rng)
     return (

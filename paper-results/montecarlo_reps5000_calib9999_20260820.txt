@@ -1,0 +1,103 @@
+Voigt MLE Monte Carlo: REPS = 5000 per design, starts = 7
+Coverage: covU counts suppressed standard errors as non-covering;
+covC conditions on valid standard errors.
+
+Boundary LR calibration (closed family; pivotal: depends only on n); B = 9999
+  n =    100
+    Gaussian null: cutoff  0.107 | zero atom  93.6% | deficit q95  2.1e-07 max  3.1e-07 | size of 2.706 rule 0.008 | cauchy-subfit conv  99.9%
+                   terminations: gradient_converged=6233, stalled_near_stationary=3766
+    Cauchy null:   cutoff  3.008 | zero atom  42.8% | deficit q95  6.4e-08 max  2.7e-07 | size of 2.706 rule 0.058 | cauchy-subfit conv 100.0%
+                   terminations: gradient_converged=9999
+  n =   1000
+    Gaussian null: cutoff  0.048 | zero atom  93.6% | deficit q95  1.5e-06 max  1.9e-06 | size of 2.706 rule 0.005 | cauchy-subfit conv 100.0%
+                   terminations: gradient_converged=1873, stalled_near_stationary=8126
+    Cauchy null:   cutoff  2.772 | zero atom  45.8% | deficit q95  1.2e-07 max  9.3e-07 | size of 2.706 rule 0.052 | cauchy-subfit conv 100.0%
+                   terminations: gradient_converged=9999
+  n =  10000
+    Gaussian null: cutoff  0.004 | zero atom  94.6% | deficit q95  1.2e-05 max  1.4e-05 | size of 2.706 rule 0.003 | cauchy-subfit conv  99.8%
+                   terminations: gradient_converged=554, stalled_near_stationary=9445
+    Cauchy null:   cutoff  2.671 | zero atom  46.4% | deficit q95  2.3e-07 max  2.2e-06 | size of 2.706 rule 0.049 | cauchy-subfit conv 100.0%
+                   terminations: gradient_converged=9998, stalled_near_stationary=1
+  n = 100000
+    Gaussian null: cutoff  0.000 | zero atom  95.6% | deficit q95  1.0e-04 max  1.1e-04 | size of 2.706 rule 0.005 | cauchy-subfit conv  99.9%
+                   terminations: gradient_converged=445, line_search_failed=1, stalled_near_stationary=9553
+    Cauchy null:   cutoff  2.699 | zero atom  46.2% | deficit q95  8.0e-07 max  5.5e-06 | size of 2.706 rule 0.050 | cauchy-subfit conv 100.0%
+                   terminations: gradient_converged=9998, stalled_near_stationary=1
+
+Validation on independent replications; B = 9999
+  n =    100 | Gaussian null: rejection 0.047 (MC-SE 0.002) | Cauchy null: rejection 0.049 (MC-SE 0.002)
+  n =   1000 | Gaussian null: rejection 0.052 (MC-SE 0.002) | Cauchy null: rejection 0.048 (MC-SE 0.002)
+  n =  10000 | Gaussian null: rejection 0.049 (MC-SE 0.002) | Cauchy null: rejection 0.046 (MC-SE 0.002)
+  n = 100000 | Gaussian null: rejection 0.043 (MC-SE 0.002) | Cauchy null: rejection 0.050 (MC-SE 0.002)
+
+    λ      n |  bias(μ)  rmse(μ)  covU  covC |  bias(σ)  rmse(σ)  covU  covC |  bias(γ)  rmse(γ)  covU  covC
+ 0.01    100 |  -0.0006   0.1019 0.215 0.945 |  -0.0108   0.0786 0.206 0.906 |   0.0011   0.0234 0.227 0.997
+ 0.01   1000 |   0.0005   0.0315 0.786 0.952 |  -0.0005   0.0246 0.787 0.953 |  -0.0000   0.0076 0.810 0.981
+ 0.01  10000 |   0.0001   0.0102 0.946 0.946 |   0.0000   0.0077 0.949 0.949 |  -0.0000   0.0023 0.938 0.938
+ 0.01 100000 |  -0.0000   0.0032 0.949 0.949 |  -0.0000   0.0024 0.953 0.953 |  -0.0000   0.0007 0.951 0.951
+ 0.10    100 |   0.0014   0.1140 0.798 0.944 |  -0.0048   0.1168 0.801 0.947 |  -0.0034   0.0713 0.830 0.981
+ 0.10   1000 |  -0.0005   0.0357 0.947 0.947 |  -0.0009   0.0349 0.947 0.947 |   0.0002   0.0220 0.942 0.942
+ 0.10  10000 |   0.0001   0.0111 0.945 0.945 |  -0.0003   0.0110 0.948 0.948 |   0.0001   0.0071 0.950 0.950
+ 0.10 100000 |  -0.0000   0.0035 0.951 0.951 |   0.0001   0.0034 0.949 0.949 |  -0.0000   0.0022 0.945 0.945
+ 1.00    100 |   0.0072   0.2135 0.863 0.945 |  -0.0621   0.4567 0.861 0.942 |  -0.0209   0.2560 0.852 0.933
+ 1.00   1000 |  -0.0001   0.0676 0.950 0.950 |  -0.0038   0.1279 0.948 0.948 |  -0.0033   0.0859 0.941 0.941
+ 1.00  10000 |   0.0005   0.0211 0.950 0.950 |  -0.0005   0.0394 0.949 0.949 |   0.0000   0.0266 0.946 0.946
+ 1.00 100000 |  -0.0001   0.0066 0.947 0.947 |   0.0000   0.0123 0.953 0.953 |  -0.0001   0.0083 0.951 0.951
+
+Diagnostics per design:
+ 0.01    100 | conv  67.3% | bdry σ   0.0% γ  77.2% up  0.0% | PD exp 100.0% obs  81.9% | SE  22.8% | LR keeps: Gauss  78.6% Cauchy   0.0% | terminations: gradient_converged=3367, stalled_near_stationary=1633
+ 0.01   1000 | conv  83.7% | bdry σ   0.0% γ  17.5% up  0.0% | PD exp 100.0% obs 100.0% | SE  82.5% | LR keeps: Gauss  18.1% Cauchy   0.0% | terminations: gradient_converged=4187, stalled_near_stationary=813
+ 0.01  10000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 0.01 100000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 0.10    100 | conv  91.2% | bdry σ   0.0% γ  15.4% up  0.0% | PD exp 100.0% obs  96.3% | SE  84.6% | LR keeps: Gauss  16.2% Cauchy   0.2% | terminations: gradient_converged=4562, stalled_near_stationary=438
+ 0.10   1000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 0.10  10000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 0.10 100000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 1.00    100 | conv 100.0% | bdry σ   8.7% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE  91.3% | LR keeps: Gauss   0.0% Cauchy  58.7%
+ 1.00   1000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.2%
+ 1.00  10000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+ 1.00 100000 | conv 100.0% | bdry σ   0.0% γ   0.0% up  0.0% | PD exp 100.0% obs 100.0% | SE 100.0% | LR keeps: Gauss   0.0% Cauchy   0.0%
+
+Notes: 'bdry σ/γ' are the shares of samples in which the corresponding width
+was estimated on (or effectively on) its boundary — the Cauchy or Gaussian
+component undetected. 'LR keeps' is the share in which the CLOSED-FAMILY
+boundary likelihood-ratio test (boundary_lr; nonnegative by construction)
+at the calibrated finite-sample cutoff (printed above; pivotal, so it
+depends only on n; level at most 5% because the null distribution carries
+an atom at zero) does not reject the submodel; near the boundary this
+exceeds the flag shares because the width MLE frequently sits at a small
+interior value in submodel-true samples. The Cauchy-side cutoff approaches
+2.706 (Self-Liang in τ = σ²); the Gaussian side is nonregular and its
+cutoff is a genuine finite-sample quantity, size-validated above on
+independent replications.
+
+LaTeX rows, Table A (λ, n, then bias/RMSE/covU/covC for μ, σ, γ):
+
+0.01 & 100 & -0.0006 & 0.1019 & 0.215 & 0.945 & -0.0108 & 0.0786 & 0.206 & 0.906 & 0.0011 & 0.0234 & 0.227 & 0.997 \\
+0.01 & 1000 & 0.0005 & 0.0315 & 0.786 & 0.952 & -0.0005 & 0.0246 & 0.787 & 0.953 & -0.0000 & 0.0076 & 0.810 & 0.981 \\
+0.01 & 10000 & 0.0001 & 0.0102 & 0.946 & 0.946 & 0.0000 & 0.0077 & 0.949 & 0.949 & -0.0000 & 0.0023 & 0.938 & 0.938 \\
+0.01 & 100000 & -0.0000 & 0.0032 & 0.949 & 0.949 & -0.0000 & 0.0024 & 0.953 & 0.953 & -0.0000 & 0.0007 & 0.951 & 0.951 \\
+0.10 & 100 & 0.0014 & 0.1140 & 0.798 & 0.944 & -0.0048 & 0.1168 & 0.801 & 0.947 & -0.0034 & 0.0713 & 0.830 & 0.981 \\
+0.10 & 1000 & -0.0005 & 0.0357 & 0.947 & 0.947 & -0.0009 & 0.0349 & 0.947 & 0.947 & 0.0002 & 0.0220 & 0.942 & 0.942 \\
+0.10 & 10000 & 0.0001 & 0.0111 & 0.945 & 0.945 & -0.0003 & 0.0110 & 0.948 & 0.948 & 0.0001 & 0.0071 & 0.950 & 0.950 \\
+0.10 & 100000 & -0.0000 & 0.0035 & 0.951 & 0.951 & 0.0001 & 0.0034 & 0.949 & 0.949 & -0.0000 & 0.0022 & 0.945 & 0.945 \\
+1.00 & 100 & 0.0072 & 0.2135 & 0.863 & 0.945 & -0.0621 & 0.4567 & 0.861 & 0.942 & -0.0209 & 0.2560 & 0.852 & 0.933 \\
+1.00 & 1000 & -0.0001 & 0.0676 & 0.950 & 0.950 & -0.0038 & 0.1279 & 0.948 & 0.948 & -0.0033 & 0.0859 & 0.941 & 0.941 \\
+1.00 & 10000 & 0.0005 & 0.0211 & 0.950 & 0.950 & -0.0005 & 0.0394 & 0.949 & 0.949 & 0.0000 & 0.0266 & 0.946 & 0.946 \\
+1.00 & 100000 & -0.0001 & 0.0066 & 0.947 & 0.947 & 0.0000 & 0.0123 & 0.953 & 0.953 & -0.0001 & 0.0083 & 0.951 & 0.951 \\
+
+LaTeX rows, Table B (λ, n, conv%, bdryσ%, bdryγ%, PDexp%, PDobs%, SE%,
+LR-keep Gauss %, LR-keep Cauchy %):
+
+0.01 & 100 & 67.3 & 0.0 & 77.2 & 100.0 & 81.9 & 22.8 & 78.6 & 0.0 \\
+0.01 & 1000 & 83.7 & 0.0 & 17.5 & 100.0 & 100.0 & 82.5 & 18.1 & 0.0 \\
+0.01 & 10000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+0.01 & 100000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+0.10 & 100 & 91.2 & 0.0 & 15.4 & 100.0 & 96.3 & 84.6 & 16.2 & 0.2 \\
+0.10 & 1000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+0.10 & 10000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+0.10 & 100000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+1.00 & 100 & 100.0 & 8.7 & 0.0 & 100.0 & 100.0 & 91.3 & 0.0 & 58.7 \\
+1.00 & 1000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.2 \\
+1.00 & 10000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\
+1.00 & 100000 & 100.0 & 0.0 & 0.0 & 100.0 & 100.0 & 100.0 & 0.0 & 0.0 \\

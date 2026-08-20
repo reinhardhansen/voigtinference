@@ -45,8 +45,13 @@ def voigt_fisher(mu, sigma, gamma, nodes: int = 400):
     The quadrature is vectorised over nodes and shares a single Faddeeva
     evaluation between the density and the score.
     """
+    if not (np.isfinite(mu) and np.isfinite(sigma) and np.isfinite(gamma)):
+        raise ValueError("mu, sigma, gamma must be finite")
     if sigma <= 0.0 or gamma <= 0.0:
         raise ValueError("sigma and gamma must be > 0 for the Fisher information")
+    if not isinstance(nodes, (int, np.integer)) or isinstance(nodes, bool) \
+            or nodes < 2:
+        raise ValueError("nodes must be an integer >= 2")
 
     t, wq = _leggauss(nodes)
     u = (np.pi / 2.0) * t

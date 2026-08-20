@@ -79,15 +79,15 @@ Run single-threaded on both sides (`OMP_NUM_THREADS=1`, `julia -t 1`) so BLAS th
 the 3x3 solves does not leak into the comparison, and record every version — special-function
 performance moves between releases.
 
-## One implementation difference worth knowing about
+## What the fused rows measure
 
-`bench.jl` also times a `fused_ll_grad_hess` routine that is *not* part of the shipped
-`VoigtInference.jl`. The Julia package's optimiser calls `voigt_score` and `voigt_hessian`
-separately, so it evaluates `w(z)` twice per observation per iteration, plus once per
-line-search trial. The Python implementation fuses those into one pass and carries the line
-search's evaluation forward to the accepted step, so an accepted Newton iteration costs one
-Faddeeva pass over the sample.
-
-That is an implementation choice, not a language difference, and the fused row exists so the
-comparison can separate the two. If the fused Julia timing is close to the Python one, the
-right conclusion is that the shipped Julia optimiser should adopt the same structure.
+Both shipped optimisers now use a fused internal kernel: the log-likelihood,
+score, and Hessian come from ONE Faddeeva evaluation per observation, and
+Python additionally hands the accepted line-search evaluation forward so an
+accepted Newton iteration costs a single pass over the sample (Julia
+re-evaluates derivatives at the accepted point, so an accepted iteration may
+cost two passes). The benchmark times three variants to keep those effects
+separate: the stand-alone public routines (three passes, the price of calling
+`voigt_logpdf`/`voigt_score`/`voigt_hessian` independently), the fused
+one-pass kernel (mirroring what the optimisers run internally), and the full
+MLE.

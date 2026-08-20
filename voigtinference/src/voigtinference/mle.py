@@ -58,6 +58,7 @@ class VoigtMLEResult:
     loglik_cauchy: float = float("nan")
     gaussian_fit: tuple = (float("nan"), float("nan"))
     cauchy_fit: tuple = (float("nan"), float("nan"))
+    cauchy_fit_converged: bool = False
     gaussian_se: tuple = (float("nan"), float("nan"))
     cauchy_se: tuple = (float("nan"), float("nan"))
     starts: int = 1
@@ -87,13 +88,15 @@ class VoigtMLEResult:
             )
         if self.gamma_boundary:
             lines.append(
-                "note: gamma at its lower clamp (fitted model numerically "
-                "Gaussian); Wald standard errors suppressed"
+                "note: fit is effectively on the gamma = 0 boundary (literal "
+                "clamp, negligible width ratio, or likelihood-equivalent to "
+                "the Gaussian submodel); Wald standard errors suppressed"
             )
         if self.sigma_boundary:
             lines.append(
-                "note: sigma at its lower clamp (fitted model numerically "
-                "Cauchy); Wald standard errors suppressed"
+                "note: fit is effectively on the sigma = 0 boundary (literal "
+                "clamp, negligible width ratio, or likelihood-equivalent to "
+                "the Cauchy submodel); Wald standard errors suppressed"
             )
         if self.upper_boundary:
             lines.append("note: a width reached its upper clamp")
@@ -105,7 +108,7 @@ class VoigtMLEResult:
 
 
 def _startvalues(y: np.ndarray):
-    """Moment-free starting values (the Voigt profile has no finite moments)."""
+    """Moment-free starting values (no finite positive integer moments)."""
     mu0 = float(np.median(y))
     d = np.abs(y - mu0)
     # tails are Lorentzian: P(|Y - mu| > c) ~ 2 gamma / (pi c), so at c = q90(|d|)
@@ -353,6 +356,23 @@ def _newton_core(y, eta0, lb, ub, maxiter, gtol, verbose):
         if verbose:
             print(f"iter {it:3d}  loglik {n * ll:.8f}")
 
+    if reason == "max_iterations":
+        # the final permitted iteration ACCEPTED a step, so the loop exited
+        # before evaluating derivatives at the returned point: the stored
+        # gradient describes the previous iterate.  Evaluate the returned
+        # point once and reapply the requested convergence criterion, so
+        # the reported diagnostics and the convergence verdict belong to
+        # the parameters actually returned.
+        _, g_raw, _, _ = loglik_grad_hess(
+            y, eta[0], np.exp(eta[1]), np.exp(eta[2]),
+            need_hess=False, need_ll=False, _kl_cache=cache,
+        )
+        nfev += 1
+        g = np.array([1.0, np.exp(eta[1]), np.exp(eta[2])]) * (g_raw / n)
+        if np.all(np.isfinite(g)) and _projnorm(g, eta, lb, ub) < gtol:
+            converged = True
+            reason = "gradient_converged"
+
     gnorm = float(np.linalg.norm(g)) if np.all(np.isfinite(g)) else np.nan
     pgnorm = _projnorm(g, eta, lb, ub) if np.all(np.isfinite(g)) else np.nan
     return eta, ll, converged, it, reason, gnorm, pgnorm, nfev
@@ -408,14 +428,18 @@ def voigt_mle(
         raise ValueError("need at least 3 observations")
     if not np.all(np.isfinite(y)):
         raise ValueError("data contain non-finite values")
-    if maxiter < 1:
-        raise ValueError("maxiter must be >= 1")
+    if not isinstance(maxiter, (int, np.integer)) or isinstance(maxiter, bool) \
+            or maxiter < 1:
+        raise ValueError("maxiter must be an integer >= 1")
     if not gtol > 0:
         raise ValueError("gtol must be > 0")
-    if nodes < 2:
-        raise ValueError("nodes must be >= 2")
-    if starts < 1:
-        raise ValueError("starts must be >= 1 (capped at 7)")
+    if not isinstance(nodes, (int, np.integer)) or isinstance(nodes, bool) \
+            or nodes < 2:
+        raise ValueError("nodes must be an integer >= 2")
+    if not isinstance(starts, (int, np.integer)) or isinstance(starts, bool) \
+            or not 1 <= starts <= 7:
+        raise ValueError("starts must be an integer in 1..7 "
+                         "(7 deterministic starting values exist)")
 
     mu0, sigma0, gamma0 = _startvalues(y)
     # keep the log-widths in a sane range relative to the data scale; the true
@@ -448,7 +472,7 @@ def voigt_mle(
 
     # boundary submodels (fitted before the flags: they feed the guard)
     mg, sg, llg = _gaussian_fit(y)
-    mc, gc, llc, _ = _cauchy_fit(y)
+    mc, gc, llc, cauchy_conv = _cauchy_fit(y)
 
     # submodel-domination guard: the Voigt family nests both
     # submodels, so a full-model candidate below either submodel likelihood
@@ -458,7 +482,17 @@ def voigt_mle(
     # the tiny-width bound sits legitimately a clamp-residual below the exact
     # submodel likelihood (~1e-3 at n = 1e5), which is not a failed search
     tol_dom = 1e-7 * (1.0 + abs(max(llg, llc)))
-    if n * best[1] < max(llg, llc) - tol_dom:
+    # boundary-aware refinement: ANY candidate within 4 log-likelihood units
+    # of the better submodel (not only outright deficits) is refit from two
+    # submodel-informed starts -- nuisance parameters at the submodel fit,
+    # vanishing other width -- followed by full joint Newton refinement.
+    # This resolves small genuine interior improvements near the boundaries,
+    # which are exactly what the calibrated boundary likelihood-ratio
+    # statistics are made of; the optimizer's objective resolution
+    # (~eps*|ll|*(16+sqrt(n))) is orders of magnitude below the calibrated
+    # critical values.  A deficit persisting beyond tol_dom is reported as
+    # the termination reason.
+    if n * best[1] < max(llg, llc) + 4.0:
         informed = [
             np.array([mg, min(max(np.log(sg), lb), ub),
                       min(max(np.log(1e-3 * sg), lb), ub)]),
@@ -479,9 +513,11 @@ def voigt_mle(
     sigma_hat = float(np.exp(eta[1]))
     gamma_hat = float(np.exp(eta[2]))
     # boundary flags: clamp active, OR width negligible relative to the other
-    # width (the gradient in a log-width vanishes proportionally to the width,
-    # so the optimiser can satisfy the gradient criterion at a tiny width
-    # without touching the literal clamp), OR likelihood evidence: a Voigt
+    # width (the log-width gradient vanishes with the width -- like gamma for
+    # the Lorentzian width and like sigma^2 for the Gaussian width, via
+    # tau = sigma^2 -- so the optimiser can satisfy the gradient criterion at
+    # a tiny width without touching the literal clamp), OR likelihood
+    # evidence: a Voigt
     # fit that is not strictly better than a nested boundary submodel is
     # effectively that submodel, whatever the fitted width says (fixed
     # width-ratio flags alone miss tolerance-limited near-boundary stops
@@ -543,6 +579,7 @@ def voigt_mle(
         loglik_cauchy=llc,
         gaussian_fit=(mg, sg),
         cauchy_fit=(mc, gc),
+        cauchy_fit_converged=bool(cauchy_conv),
         # closed-form submodel standard errors (valid inference for the
         # nested model when the full fit is on that boundary): Gaussian
         # (sg/sqrt(n), sg/sqrt(2n)); Cauchy expected info is diagonal with
@@ -553,3 +590,27 @@ def voigt_mle(
         iterations=it,
         nfev=nfev,
     )
+
+
+def boundary_lr(res):
+    """Boundary likelihood-ratio statistics against the CLOSED Voigt family.
+
+    The closed family includes the ``gamma = 0`` (Gaussian) and ``sigma = 0``
+    (Cauchy) boundary submodels, so the full-model likelihood is the maximum
+    of the interior candidate and both submodel likelihoods, and each
+    statistic is nonnegative by construction::
+
+        LR_sub = max(0, 2 (max(ll_interior, ll_G, ll_C) - ll_sub))
+
+    The closed-family maximum is what makes the statistic a likelihood
+    ratio; the outer clamp only absorbs the last-ulp roundoff of the max.
+    A raw difference ``2 (res.loglik - res.loglik_gaussian)`` is NOT a
+    valid LR: near a boundary the interior candidate legitimately sits a
+    clamp-residual below the exact submodel likelihood, so the raw
+    difference can be negative by far more than roundoff.
+
+    Returns ``(lr_gaussian, lr_cauchy)``.
+    """
+    llfull = max(res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    return (max(0.0, 2.0 * (llfull - res.loglik_gaussian)),
+            max(0.0, 2.0 * (llfull - res.loglik_cauchy)))

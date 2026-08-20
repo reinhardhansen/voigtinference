@@ -11,10 +11,13 @@ something stronger: agreement with 60-digit ground truth.  They validate
 
 The score and the Hessian switch at *different* points.  The Hessian recursion
 divides the cancelling score components by ``sigma`` and multiplies by ``ytil``
-at each step, so it loses digits far sooner; its crossover is near
-``|ytil| = 40 * scale`` against ``500 * scale`` for the score.  Sharing one
-switch leaves the Hessian with no correct digits over more than a decade of the
-tail, which is what these tests exist to prevent regressing.
+at each step, so it loses digits far sooner: its dispatch criterion is
+``r = sigma^2/(ytil^2 + gamma^2) < 5e-4`` against ``r < 1e-4`` for the score
+(for the moderate-ratio regimes here that is roughly ``|ytil| = 45 * scale``
+versus ``100 * scale``; at ``gamma >> sigma`` both criteria hold for every
+``ytil``, including the line center).  Sharing one switch would cost the
+Hessian about two orders of magnitude at its crossover, which is what these
+tests exist to prevent regressing.
 
 Run this module as a script to print both crossover tables.
 """

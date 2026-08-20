@@ -66,19 +66,42 @@ Tests: `julia --project=. -e 'using Pkg; Pkg.test()'` (from
 | path | contents |
 | --- | --- |
 | `voigtinference/src/` | the Python package |
-| `voigtinference/tests/` | 53 package tests + lmfit-Jacobian tests |
+| `voigtinference/tests/` | the pytest suite: 60-digit accuracy references, likelihood identities, input contracts, boundary diagnostics, closed-family LR, MLE recovery, lmfit-Jacobian integration |
 | `voigtinference/examples/` | demo, MINUIT-style fit, **analytic Jacobians for lmfit's VoigtModel** |
-| `voigtinference/bench/` | two-language benchmark + bit-identity cross-check (`run_bench.sh`), far-tail validation table (`tailtable.py`) |
+| `voigtinference/bench/` | two-language benchmark + `1e-12` cross-check (`run_bench.sh`), far-tail validation table (`tailtable.py`) |
 | `VoigtInference.jl/src/` | the Julia package |
-| `VoigtInference.jl/test/` | 71 tests (finite differences, Tweedie identities, information equality, MLE recovery) |
-| `VoigtInference.jl/examples/` | demo, Monte Carlo study, figures, Raman-spectrum fit, 256/512-bit tail validation |
+| `VoigtInference.jl/test/` | the Julia suite (finite differences, Tweedie identities, information equality, boundaries, closed-family LR, MLE recovery) |
+| `VoigtInference.jl/examples/` | demo, Monte Carlo study + boundary-LR calibration, figures, Raman-spectrum fit, 256/512-bit tail validation |
 
 The Raman example uses the red-ochre spectrum distributed with the CRAN
 `voigt` package (GPL-2, Cannas & Piras; data of Pisu et al., Spectrochim.
 Acta A 329 (2025) 125581), which is **not** redistributed here;
-`VoigtInference.jl/examples/get_raman.R` fetches the exact CRAN archive and
-converts it (a one-time step that requires R), printing checksums for
-provenance.
+`VoigtInference.jl/examples/get_raman.R` fetches the pinned upstream
+version (with CRAN-Archive fallback), verifies its checksum, and converts
+it (a one-time step that requires R).
+
+## Reproducing the paper's numbers
+
+All scripts are deterministic (fixed integer seeds; thread-count
+invariant). From the repository root:
+
+```sh
+python -m pip install -e "voigtinference[test]" && python -m pytest voigtinference/tests -q
+julia --project=VoigtInference.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+julia --project=VoigtInference.jl VoigtInference.jl/examples/certify.jl          # validation grid
+bash voigtinference/bench/run_bench.sh                                           # timings + cross-check
+python voigtinference/bench/tailtable.py                                         # far-tail table
+REPS=5000 CALIB_B=9999 julia -t auto --project=VoigtInference.jl VoigtInference.jl/examples/montecarlo.jl   # Monte Carlo + LR calibration + validation
+Rscript VoigtInference.jl/examples/get_raman.R                                   # fetch Raman data (one-time)
+julia --project=VoigtInference.jl/examples -e 'using Pkg; Pkg.develop(path="VoigtInference.jl"); Pkg.instantiate()'   # plotting project (one-time)
+julia --project=VoigtInference.jl/examples VoigtInference.jl/examples/figures.jl # figure PDFs
+julia --project=VoigtInference.jl/examples VoigtInference.jl/examples/raman.jl   # Raman fit + figure
+```
+
+The computational examples (certify, Monte Carlo, benchmark) run in the
+package project; only the figure scripts need the plotting project in
+`VoigtInference.jl/examples/`. Frozen outputs behind the published tables
+are in `paper-results/` with their own README.
 
 ## Numerical robustness
 

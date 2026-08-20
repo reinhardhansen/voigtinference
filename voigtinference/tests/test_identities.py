@@ -29,9 +29,23 @@ RATIOS = [10.0, 50.0, 1.0e2, 1.0e3, 1.0e4, 1.0e6, 1.0e8]
 RATIOS_IDENTITY = [10.0, 50.0, 1.0e2, 1.0e3, 1.0e4]
 
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=4)
+def _leggauss(n):
+    """Base Gauss-Legendre rule, computed once: the eigendecomposition
+    behind leggauss(4000) costs seconds and does not depend on gamma, so
+    recomputing it per parameterization dominated the suite's runtime."""
+    t, w = np.polynomial.legendre.leggauss(n)
+    t.flags.writeable = False
+    w.flags.writeable = False
+    return t, w
+
+
 def _quad_nodes(gamma, n=4000):
     """y = gamma * tan(pi t / 2): maps the Lorentzian tails to [-1, 1]."""
-    t, w = np.polynomial.legendre.leggauss(n)
+    t, w = _leggauss(n)
     y = gamma * np.tan(np.pi * t / 2)
     dy = gamma * (np.pi / 2) / np.cos(np.pi * t / 2) ** 2
     return y, w * dy
@@ -64,8 +78,27 @@ def _scaled_moments(gamma):
 @pytest.mark.parametrize("ratio", RATIOS)
 def test_score_is_centered(ratio):
     Es, _ = _scaled_moments(ratio * SIGMA)
-    # old leading-order branches gave |scaled E[s_sigma]| -> 0.5
     assert np.all(np.abs(Es) < 1e-3), Es
+
+
+@pytest.mark.parametrize("ratio", [30.0, 1.0e2, 1.0e3])
+def test_sigma_score_centering_strong_scale(ratio):
+    """E[s_sigma] * gamma^4 / sigma^3 -> 0: the strongly scaled bias.
+
+    The Fisher-order scaling used above (gamma^2/sigma) sends the old
+    leading-order-branch bias E[s_sigma] * gamma^4 / sigma^3 -> 1/2 to
+    zero as gamma/sigma grows, so it cannot detect that failure mode at
+    large ratios.  This test applies the strong gamma^4 scaling directly,
+    at ratios where double-precision quadrature is stable: the old
+    branches give 0.5 here, the retained sigma^6 expansion leaves O(r^2)
+    (~1e-5 at ratio 30, smaller beyond), and the quadrature noise on this
+    scale is orders below the tolerance."""
+    gamma = ratio * SIGMA
+    y, w = _quad_nodes(gamma)
+    f = voigt_pdf(y, 0.0, SIGMA, gamma)
+    s = voigt_score(y, 0.0, SIGMA, gamma)
+    strong = float(np.sum(w * f * s[:, 1]) * gamma**4 / SIGMA**3)
+    assert abs(strong) < 1e-3, strong
 
 
 @pytest.mark.parametrize("ratio", RATIOS_IDENTITY)
@@ -88,21 +121,35 @@ def test_information_identity_and_psd(ratio):
 
 
 def test_dispatched_score_differentiates_the_loglik():
-    """FD of the exact sample log likelihood vs the aggregated dispatched
-    score, in the all-branch regime."""
+    """Richardson-extrapolated FD of the exact sample log likelihood vs the
+    aggregated dispatched score, in the all-branch regime.
+
+    Each direction is scaled by its expected root-information order
+    (sqrt(n I_ii): I_mm, I_gg ~ 1/(2 gamma^2), I_ss ~ sigma^2/gamma^4):
+    the sigma direction differentiates a tiny signal riding on a log
+    likelihood of magnitude ~1e4, so a flat abs(fd)+1 denominator would
+    accept an O(1)-biased sigma score.  Richardson extrapolation removes
+    the O(h^2) truncation so the step can be large enough to keep the
+    log-likelihood rounding noise below the scaled tolerance."""
     rng = np.random.default_rng(5)
     gamma = 2.0e3 * SIGMA                      # every point dispatches
-    y = gamma * np.tan(np.pi * (rng.random(2000) - 0.5))
+    n = 2000
+    y = gamma * np.tan(np.pi * (rng.random(n) - 0.5))
     theta = np.array([0.1, SIGMA, gamma])
 
     s = voigt_score(y, *theta).sum(axis=0)
-    for i, h in enumerate([1e-4, 1e-5 * SIGMA, 1e-2 * gamma]):
-        tp = theta.copy(); tp[i] += h
-        tm = theta.copy(); tm[i] -= h
-        fd = (voigt_loglik(y, *tp) - voigt_loglik(y, *tm)) / (2 * h)
-        # tolerance is FD-limited: the sigma direction differentiates a tiny
-        # signal (~1e-4) riding on a log likelihood of magnitude ~1e4
-        assert abs(s[i] - fd) / (abs(fd) + 1.0) < 1e-3, (i, s[i], fd)
+    denom = np.array([
+        np.sqrt(n / 2.0) / gamma,
+        np.sqrt(float(n)) * SIGMA / gamma**2,
+        np.sqrt(n / 2.0) / gamma,
+    ])
+    for i, h in enumerate([1e-3, 4e-2 * SIGMA, 1e-2 * gamma]):
+        def fd(step, i=i):
+            tp = theta.copy(); tp[i] += step
+            tm = theta.copy(); tm[i] -= step
+            return (voigt_loglik(y, *tp) - voigt_loglik(y, *tm)) / (2 * step)
+        fd_r = (4.0 * fd(h / 2) - fd(h)) / 3.0
+        assert abs(s[i] - fd_r) < 2e-3 * denom[i], (i, s[i], fd_r, denom[i])
 
 
 def test_extreme_ratio_reference_points():

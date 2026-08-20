@@ -3,6 +3,7 @@ Icon?
 Icon
 dist/
 .release-venv/
+.release-worktree/
 Manifest.toml
 __pycache__/
 *.pyc

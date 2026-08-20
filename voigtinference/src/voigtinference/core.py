@@ -81,6 +81,12 @@ _LOG_SQRT2PI = 0.5 * np.log(2.0 * np.pi)
 #: at gamma/sigma ~ 50-100.  Certified by the Julia
 #: package's examples/certify.jl over gamma/sigma in [1e-8, 1e8]; see its
 #: output for current bounds.  Values must match Julia bit for bit.
+#:
+#: Validated dynamic range: width ratios gamma/sigma in [1e-8, 1e8] and
+#: |y - mu| up to 1e8 times the profile scale.  Far outside it (input
+#: magnitudes beyond ~1e150) the branch criterion's (y-mu)^2 + gamma^2
+#: overflows and the derivative routines return non-finite values rather
+#: than silently dispatching; keep inputs within representable squares.
 _R_SCORE = 1.0e-4    # score and conditional moments switch where r < _R_SCORE
 _R_HESS = 5.0e-4     # Hessian switches where r < _R_HESS
 
@@ -515,6 +521,9 @@ def loglik_only(y, mu, sigma, gamma):
     :func:`loglik_grad_hess` at the accepted step, so an accepted Newton
     iteration costs exactly one Faddeeva pass over the sample.
     """
+    if not np.isfinite(mu):
+        raise ValueError("mu must be finite")
+    _check_interior(sigma, gamma)
     yv, _ = _asarray(y)
     ytil = yv - mu
     K, L = _kl(ytil, sigma, gamma)
@@ -545,8 +554,13 @@ def loglik_grad_hess(y, mu, sigma, gamma, need_hess=True, need_ll=True, _kl_cach
         ``cache`` is the ``(K, L, ytil)`` triple for reuse.
     """
     if _kl_cache is not None:
+        # trusted fast path: the cache was computed at these exact parameter
+        # values by a previous validated call (the optimizer's inner loop)
         K, L, ytil = _kl_cache
     else:
+        if not np.isfinite(mu):
+            raise ValueError("mu must be finite")
+        _check_interior(sigma, gamma)
         yv, _ = _asarray(y)
         ytil = yv - mu
         K, L = _kl(ytil, sigma, gamma)
