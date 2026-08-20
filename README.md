@@ -1,12 +1,14 @@
 # voigtinference
 
-Exact likelihood calculus for the Voigt profile from a single Faddeeva
-evaluation: density, score, Hessian, Fisher information, maximum likelihood
-estimation, and the conditional moments of the Gaussian component
-(deconvolution) — with numerically robust far-tail behavior.
+Exact likelihood calculus and conditional attribution for the Voigt profile,
+from a single Faddeeva evaluation per observation: density, score, Hessian,
+Fisher information, maximum likelihood estimation, and the conditional
+moments of the Gaussian component (deconvolution) — with numerically robust
+far-tail behavior.
 
-Two implementations with a common interface, which agree **bit for bit** on
-every evaluation-level quantity:
+Two implementations with a common interface, cross-validated to within
+`1e-12` on the distributed validation grid (in the recorded reference
+environment every difference was in fact zero):
 
 - **`voigtinference/`** — Python (NumPy + SciPy only). The reference and
   archived implementation.
@@ -15,9 +17,9 @@ every evaluation-level quantity:
 
 Companion papers:
 
-> P. R. Hansen and C. Tong, *Exact likelihood calculus for the Voigt profile
-> from a single Faddeeva evaluation* (software note; prepared for Computer
-> Physics Communications).
+> P. R. Hansen and C. Tong, *voigtinference: Exact likelihood calculus and
+> conditional attribution for the Voigt profile* (software note; prepared for
+> Computer Physics Communications).
 >
 > P. R. Hansen and C. Tong, *Exact likelihood inference and robust filtering
 > for Gauss–Cauchy convolution models*, arXiv:2605.01665 (theory).

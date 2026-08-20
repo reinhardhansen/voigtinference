@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "voigtinference"
 version = "1.0.0"
-description = "Exact likelihood inference for the Voigt profile from a single Faddeeva evaluation"
+description = "Exact likelihood calculus and conditional attribution for the Voigt profile"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
