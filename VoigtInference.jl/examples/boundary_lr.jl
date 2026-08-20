@@ -21,8 +21,16 @@
 #     cutoff is the honest reference; the printed size of the naive 2.706
 #     rule quantifies its miscalibration.
 #
-# Standalone use:  julia --project=. examples/boundary_lr.jl [n ...]
-# (default n = 100, 1000; B via env CALIB_B, default 999)
+# Standalone use:  julia -t auto --project=. examples/boundary_lr.jl [n ...]
+# (default n = 100, 1000; B via env CALIB_B, default 999). The Monte Carlo
+# standard error of an estimated 95% cutoff scales like the density-inverse
+# times sqrt(0.05*0.95/B); publication numbers use CALIB_B = 9999, for
+# which the tail-probability uncertainty is about 0.002.
+#
+# Replications are embarrassingly parallel and each one is seeded by its own
+# fixed integer, a deterministic function of (n-index, replication), so the
+# output is bit-identical for ANY thread count (julia -t 1 and -t 8 agree
+# byte for byte).
 using VoigtInference, Random, Printf, Statistics
 
 const CALIB_B = parse(Int, get(ENV, "CALIB_B", "999"))
@@ -35,7 +43,8 @@ _q95(v) = sort(v)[clamp(ceil(Int, 0.95 * length(v)), 1, length(v))]
 
 Dicts mapping n to the calibrated 95% null cutoffs of LR_G and LR_C.
 Prints, per n, the cutoffs and the true size of the naive 2.706 rule.
-Deterministic for fixed (ns order, B, seedbase).
+Deterministic for fixed (ns order, B, seedbase), for any thread count:
+every replication seeds its own generator with a fixed integer.
 """
 function calibrate_boundary_cutoffs(ns; B::Int = CALIB_B, starts::Int = 7,
                                     seedbase::Int = 7000)
@@ -43,15 +52,19 @@ function calibrate_boundary_cutoffs(ns; B::Int = CALIB_B, starts::Int = 7,
     cutc = Dict{Int,Float64}()
     println("Boundary LR calibration (pivotal: depends only on n); B = $B")
     for (k, n) in enumerate(ns)
-        rngG = MersenneTwister(seedbase + 100 + k)
-        rngC = MersenneTwister(seedbase + 200 + k)
         lrg = Vector{Float64}(undef, B)
         lrc = Vector{Float64}(undef, B)
-        for b in 1:B
-            yg = randn(rngG, n)                       # standard Gaussian null
+        Threads.@threads for b in 1:B
+            # per-replication integer seeds: the 1e6*(seedbase+k) blocks are
+            # disjoint across k (2B+1 < 1e6) and from the montecarlo.jl
+            # design blocks (~2.0e12), and the result cannot depend on the
+            # thread schedule
+            base = 1_000_000 * (seedbase + k)
+            yg = randn(MersenneTwister(base + 2b), n)        # Gaussian null
             r = voigt_mle(yg; starts = starts)
             lrg[b] = 2 * (r.loglik - r.loglik_gaussian)
-            yc = tan.(π .* (rand(rngC, n) .- 0.5))    # standard Cauchy null
+            u = rand(MersenneTwister(base + 2b + 1), n)
+            yc = tan.(π .* (u .- 0.5))                       # Cauchy null
             r = voigt_mle(yc; starts = starts)
             lrc[b] = 2 * (r.loglik - r.loglik_cauchy)
         end

@@ -125,7 +125,7 @@ wherever the expansion parameter
 
     r = sigma^2 / ((y - mu)^2 + gamma^2)
 
-is small, with thresholds `r < 1e-5` for the score and conditional moments
+is small, with thresholds `r < 1e-4` for the score and conditional moments
 and `r < 5e-4` for the Hessian (the Hessian recursion cancels harder, so it
 must switch earlier).
 
@@ -139,15 +139,15 @@ construction keeps `E[s] = 0` and `E[ss'] = -E[H]` to the retained order
 (`tests/test_identities.py` verifies both by quadrature under the exact
 model), and its truncation error is `O(r^3)` pointwise.
 
-The dispatched implementation is certified against high-precision
+The dispatched implementation is validated against high-precision
 references over `gamma/sigma` in `[1e-8, 1e8]`, including the first
 actually-dispatched float on each side of every threshold, with normwise
-worst-case errors of `2.0e-9` (score), `1.2e-5` (Hessian), and `~1e-11`
+worst-case errors of `1.4e-10` (score), `6.3e-7` (Hessian), and `~6e-12`
 (conditional moments, nonnegative variance everywhere); the naive formulas
-reach errors of order `1e16` on the same grid. The certification driver is
+reach errors of order `1e16` on the same grid. The validation driver is
 `examples/certify.jl` in the Julia package; `bench/tailtable.py` reproduces
 the two-design table in the paper. The threshold constants are duplicated
-across four source locations and guarded by `check_constants.py` in CI.
+across five source locations and guarded by `check_constants.py` in CI.
 
 ## Tests
 

@@ -84,11 +84,11 @@ The exact score/Hessian formulas suffer catastrophic floating-point
 cancellation deep in the Lorentzian tail and, at large `gamma/sigma`, even
 at the line center. Both implementations dispatch to third-order
 Cauchy-limit expansions wherever `r = sigma^2/((y-mu)^2 + gamma^2)` is
-small (`r < 1e-5` for the score and conditional moments, `r < 5e-4` for the
+small (`r < 1e-4` for the score and conditional moments, `r < 5e-4` for the
 Hessian). The branches are derivatives of one truncated log density, so the
 likelihood identities `E[s] = 0` and `E[ss'] = -E[H]` survive the dispatch;
-the implementation is certified against high-precision references over
-`gamma/sigma` in `[1e-8, 1e8]` (worst cases: score `2e-9`, Hessian `1.2e-5`),
+the implementation is validated against high-precision references over
+`gamma/sigma` in `[1e-8, 1e8]` (worst cases: score `1.4e-10`, Hessian `6.3e-7`),
 while the naive formulas reach relative errors of order `1e16` on the same
 grid (`bench/tailtable.py`, `examples/certify.jl`).
 

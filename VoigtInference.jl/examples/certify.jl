@@ -202,7 +202,7 @@ end
 function ypoints(σ, γ)
     sc = sqrt(σ^2 + γ^2)
     ys = Float64[0.0, 0.3γ, γ, 2γ, 5γ, 20γ, 0.5sc, 2sc, 41γ, 100γ]
-    for rt in (1.0e-5, 5.0e-4, 1.0e-6, 1.0e-4, 1.0e-3, 1.0e-2)  # shipped + probe crossings
+    for rt in (1.0e-4, 5.0e-4, 1.0e-6, 1.0e-5, 1.0e-3, 1.0e-2)  # shipped + probe crossings
         arg = σ^2 / rt - γ^2
         if arg > 0
             yt = sqrt(arg)

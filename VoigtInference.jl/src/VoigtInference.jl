@@ -140,18 +140,18 @@ end
 # and the likelihood identities hold after integration. The branch is
 # therefore MORE accurate than the exact formulas well before cancellation
 # becomes visible. The thresholds are the minimax optima from the
-# certify.jl tune scan (worst pointwise error: score ~2e-9 at r_s = 1e-5,
-# Hessian ~6e-6 at r_h = 5e-4), and the small exact zones also remove the
+# certify.jl tune scan (worst pointwise error: score ~1e-10 at r_s = 1e-4,
+# Hessian ~6e-7 at r_h = 5e-4), and the small exact zones also remove the
 # integrated information-identity violation that large exact-branch zones
 # caused at γ/σ ~ 50-100. Certified by
 # examples/certify.jl over γ/σ ∈ [1e-8, 1e8]; see its output for bounds.
-@inline _far_tail(ỹ, σ, γ)      = σ^2 < 1.0e-5 * (ỹ^2 + γ^2)   # score, moments
+@inline _far_tail(ỹ, σ, γ)      = σ^2 < 1.0e-4 * (ỹ^2 + γ^2)   # score, moments
 @inline _far_tail_hess(ỹ, σ, γ) = σ^2 < 5.0e-4 * (ỹ^2 + γ^2)   # Hessian
 
 # Cauchy-limit branches. Every entry is the exact derivative of ONE
 # truncated expansion of the log density,
 #
-#     log f = log c + (σ²/2) A + (σ⁴/8) (B - A²) + σ⁶ (C/48 - AB/8 + A³/24),
+#     log f = log c + (σ²/2) A + (σ⁴/8) (B - A²) + σ⁶ (C/48 - AB/16 + A³/24),
 #
 # with c the Lorentzian density and A = c″/c, B = c⁗/c, C = c⁽⁶⁾/c. Deriving all entries
 # from the same truncated log density keeps the dispatched score centered
@@ -173,22 +173,22 @@ end
     rs2 = (σ * σ) / den
     sμ = ur * (2.0 + rs2 * (6.0 * w - 10.0 * v)
                 + rs2 * rs2 * (42.0 * w * w - 204.0 * w * v + 74.0 * v * v)
-                + rs2 * rs2 * rs2 * (144.0 * w * w * w - 2736.0 * w * w * v
-                                     + 3696.0 * w * v * v - 592.0 * v * v * v))
+                + rs2 * rs2 * rs2 * (414.0 * w * w * w - 3846.0 * w * w * v
+                                     + 4506.0 * w * v * v - 706.0 * v * v * v))
     sσ = (σ / den) * ((6.0 * w - 2.0 * v)
                             + rs2 * (42.0 * w * w - 108.0 * w * v
                                      + 10.0 * v * v)
-                            + rs2 * rs2 * (144.0 * w * w * w - 1944.0 * w * w * v
-                                           + 1440.0 * w * v * v
-                                           - 56.0 * v * v * v))
+                            + rs2 * rs2 * (414.0 * w * w * w - 2574.0 * w * w * v
+                                           + 1674.0 * w * v * v
+                                           - 74.0 * v * v * v))
     sγ = (w - v) / γ + gr * rs2 * ((2.0 * v - 14.0 * w)
                                          + rs2 * (-138.0 * w * w
                                                   + 172.0 * w * v
                                                   - 10.0 * v * v)
-                                         + rs2 * rs2 * (-936.0 * w * w * w
-                                                        + 4200.0 * w * w * v
-                                                        - 1976.0 * w * v * v
-                                                        + 56.0 * v * v * v))
+                                         + rs2 * rs2 * (-1686.0 * w * w * w
+                                                        + 5406.0 * w * w * v
+                                                        - 2306.0 * w * v * v
+                                                        + 74.0 * v * v * v))
     return sμ, sσ, sγ
 end
 
@@ -203,41 +203,41 @@ end
            + rs2 * (18.0 * w * w - 68.0 * w * v + 10.0 * v * v)
            + rs2 * rs2 * (210.0 * w * w * w - 1638.0 * w * w * v
                           + 1278.0 * w * v * v - 74.0 * v * v * v)
-           + rs2 * rs2 * rs2 * (1008.0 * w * w * w * w - 25632.0 * w * w * w * v
-                                + 54336.0 * w * w * v * v
-                                - 18784.0 * w * v * v * v + 592.0 * v * v * v * v)) / den
+           + rs2 * rs2 * rs2 * (2898.0 * w * w * w * w - 37512.0 * w * w * w * v
+                                + 68796.0 * w * w * v * v
+                                - 22696.0 * w * v * v * v + 706.0 * v * v * v * v)) / den
     Hμσ = (σ / den) * ur * ((12.0 * w - 20.0 * v)
                                 + rs2 * (168.0 * w * w - 816.0 * w * v
                                          + 296.0 * v * v)
-                                + rs2 * rs2 * (864.0 * w * w * w
-                                               - 16416.0 * w * w * v
-                                               + 22176.0 * w * v * v
-                                               - 3552.0 * v * v * v))
+                                + rs2 * rs2 * (2484.0 * w * w * w
+                                               - 23076.0 * w * w * v
+                                               + 27036.0 * w * v * v
+                                               - 4236.0 * v * v * v))
     Hμγ = ur * gr * (-4.0 + rs2 * (40.0 * v - 56.0 * w)
                      + rs2 * rs2 * (-828.0 * w * w + 1928.0 * w * v
                                     - 444.0 * v * v)
-                     + rs2 * rs2 * rs2 * (-7488.0 * w * w * w
-                                          + 47616.0 * w * w * v
-                                          - 40512.0 * w * v * v
-                                          + 4736.0 * v * v * v))
+                     + rs2 * rs2 * rs2 * (-13488.0 * w * w * w
+                                          + 64176.0 * w * w * v
+                                          - 49296.0 * w * v * v
+                                          + 5648.0 * v * v * v))
     Hσσ = ((6.0 * w - 2.0 * v)
            + rs2 * (126.0 * w * w - 324.0 * w * v + 30.0 * v * v)
-           + rs2 * rs2 * (720.0 * w * w * w - 9720.0 * w * w * v
-                          + 7200.0 * w * v * v - 280.0 * v * v * v)) / den
+           + rs2 * rs2 * (2070.0 * w * w * w - 12870.0 * w * w * v
+                          + 8370.0 * w * v * v - 370.0 * v * v * v)) / den
     Hγσ = (σ / den) * gr * ((4.0 * v - 28.0 * w)
                                 + rs2 * (-552.0 * w * w + 688.0 * w * v
                                          - 40.0 * v * v)
-                                + rs2 * rs2 * (-5616.0 * w * w * w
-                                               + 25200.0 * w * w * v
-                                               - 11856.0 * w * v * v
-                                               + 336.0 * v * v * v))
+                                + rs2 * rs2 * (-10116.0 * w * w * w
+                                               + 32436.0 * w * w * v
+                                               - 13836.0 * w * v * v
+                                               + 444.0 * v * v * v))
     Hγγ = ((v - 4.0 * w)
            + rs2 * (-14.0 * w * w + 76.0 * w * v - 6.0 * v * v)
            + rs2 * rs2 * (-138.0 * w * w * w + 1758.0 * w * w * v
                           - 1254.0 * w * v * v + 50.0 * v * v * v)
-           + rs2 * rs2 * rs2 * (-936.0 * w * w * w * w + 24768.0 * w * w * w * v
-                                - 56080.0 * w * w * v * v
-                                + 18176.0 * w * v * v * v - 392.0 * v * v * v * v)) / den -
+           + rs2 * rs2 * rs2 * (-1686.0 * w * w * w * w + 38136.0 * w * w * w * v
+                                - 70996.0 * w * w * v * v
+                                + 21272.0 * w * v * v * v - 518.0 * v * v * v * v)) / den -
           (w * w) / (γ * γ)
     return Hμμ, Hμσ, Hμγ, Hσσ, Hγσ, Hγγ
 end
@@ -454,7 +454,7 @@ function _loglik_grad_hess(y, μ, σ, γ)
     logconst = log(σ) + 0.5 * log(2π)
     g2 = γ * γ
     # branch gating on r = σ²/(ỹ²+γ²): Cauchy-limit branch where r < threshold
-    r_s = 1.0e-5                       # score switch   (matches _far_tail)
+    r_s = 1.0e-4                       # score switch   (matches _far_tail)
     r_h = 5.0e-4                       # Hessian switch (matches _far_tail_hess)
     @inbounds for yi in y
         ỹ = yi - μ

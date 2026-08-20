@@ -13,88 +13,88 @@
   "n_per_obs": 100000,
   "primitive": {
     "name": "scipy.special.wofz",
-    "ns_per_obs": 71.02453442605432,
-    "ns_per_obs_median": 71.08881751157563
+    "ns_per_obs": 71.65236121650335,
+    "ns_per_obs_median": 72.20794196297048
   },
   "per_obs": {
     "log-density": {
-      "ns_per_obs": 77.07860671871458,
-      "ns_per_obs_median": 77.18649078015005,
+      "ns_per_obs": 78.57624999375949,
+      "ns_per_obs_median": 78.78487793214876,
       "ratio_to_density": 1.0
     },
     "analytic score": {
-      "ns_per_obs": 81.52690283410871,
-      "ns_per_obs_median": 81.92099300989261,
-      "ratio_to_density": 1.057711164028009
+      "ns_per_obs": 82.65817535896625,
+      "ns_per_obs_median": 82.82387932232612,
+      "ratio_to_density": 1.0519485896251215
     },
     "analytic Hessian": {
-      "ns_per_obs": 95.97293266919084,
-      "ns_per_obs_median": 96.66012846327457,
-      "ratio_to_density": 1.2451306108766071
+      "ns_per_obs": 98.30430261385828,
+      "ns_per_obs_median": 98.75836956780404,
+      "ratio_to_density": 1.251068899593269
     },
     "fused ll+grad+hess": {
-      "ns_per_obs": 95.48953537327739,
-      "ns_per_obs_median": 95.77620192430913,
-      "ratio_to_density": 1.2388591262650919
+      "ns_per_obs": 96.2807749863714,
+      "ns_per_obs_median": 96.80015000049025,
+      "ratio_to_density": 1.22531649186641
     },
     "FD score (6 evals)": {
-      "ns_per_obs": 464.8470840184018,
-      "ns_per_obs_median": 465.66620899830014,
-      "ratio_to_density": 6.03081845673188
+      "ns_per_obs": 467.91304205544293,
+      "ns_per_obs_median": 469.15616700425744,
+      "ratio_to_density": 5.954891485564716
     },
     "FD Hessian (24 evals)": {
-      "ns_per_obs": 1866.4929148508236,
-      "ns_per_obs_median": 1873.8877098076046,
-      "ratio_to_density": 24.215446987285016
+      "ns_per_obs": 1901.1129147838801,
+      "ns_per_obs_median": 1906.4579153200611,
+      "ratio_to_density": 24.194497891345872
     }
   },
   "mle": [
     {
       "n": 1000,
-      "seconds": 0.0023736669681966305,
+      "seconds": 0.0022127500269562006,
       "iterations": 5,
       "faddeeva_passes": 6,
-      "seconds_per_iteration": 0.0004747333936393261,
+      "seconds_per_iteration": 0.00044255000539124013,
       "converged": true,
-      "mu": 0.48195168007321154,
-      "sigma": 0.9511623280312966,
-      "gamma": 0.3144146403116263,
-      "loglik": -1954.5199852446485
+      "mu": 0.4819516800732109,
+      "sigma": 0.9511623280313122,
+      "gamma": 0.31441464031161354,
+      "loglik": -1954.519985244648
     },
     {
       "n": 10000,
-      "seconds": 0.010003749979659915,
+      "seconds": 0.009605042054317892,
       "iterations": 6,
       "faddeeva_passes": 7,
-      "seconds_per_iteration": 0.0016672916632766526,
+      "seconds_per_iteration": 0.0016008403423863153,
       "converged": true,
-      "mu": 0.5041406479086928,
-      "sigma": 1.0000551534331186,
-      "gamma": 0.29331411860623036,
+      "mu": 0.504140647908693,
+      "sigma": 1.0000551534331115,
+      "gamma": 0.29331411860624096,
       "loglik": -19602.850050430112
     },
     {
       "n": 100000,
-      "seconds": 0.07548750005662441,
+      "seconds": 0.07931958406697959,
       "iterations": 6,
       "faddeeva_passes": 7,
-      "seconds_per_iteration": 0.012581250009437403,
+      "seconds_per_iteration": 0.01321993067782993,
       "converged": true,
       "mu": 0.4999761980005119,
-      "sigma": 1.0025570302199294,
-      "gamma": 0.29791793016155954,
+      "sigma": 1.0025570302199263,
+      "gamma": 0.2979179301615649,
       "loglik": -196660.26903826714
     }
   ],
   "fisher": {
     "nodes": 400,
-    "seconds": 9.745513727690013e-05,
-    "seconds_median": 9.812951304313293e-05
+    "seconds": 9.720776731366296e-05,
+    "seconds_median": 9.798803131543362e-05
   },
   "throughput": {
     "n": 10000,
-    "fits": 217,
-    "seconds": 2.005138708045706,
-    "fits_per_sec": 108.22193952432222
+    "fits": 216,
+    "seconds": 2.008903875015676,
+    "fits_per_sec": 107.52132179461026
   }
 }

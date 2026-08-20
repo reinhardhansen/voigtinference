@@ -15,17 +15,22 @@
 # PIVOTAL under their nulls, so the exact finite-sample cutoffs depend only
 # on n and are calibrated once per n by simulation (boundary_lr.jl, which
 # also prints the true size of the naive 2.706 rule). The same boundary
-# geometry is why the width MLE sits at an interior value of order
-# n^(-1/2) (γ) or n^(-1/4) (σ) in about half of all submodel-true samples,
-# so the flags alone understate submodel adequacy.
+# geometry is why the width MLE frequently sits at a small interior value
+# in submodel-true samples (for σ provably of order n^(-1/4), via τ = σ²;
+# for γ no standard rate applies), so the flags alone understate submodel
+# adequacy.
 #
-# Seeds are fixed integers, a deterministic function of the design indices
-# (hash() is not stable across Julia versions).
+# Seeds are fixed integers, a deterministic function of the design and
+# replication indices (hash() is not stable across Julia versions).
+# Replications are embarrassingly parallel and each seeds its own generator,
+# so the output is bit-identical for ANY thread count.
 #
-# Run from the package directory:  julia --project=. examples/montecarlo.jl
+# Run from the package directory:  julia -t auto --project=. examples/montecarlo.jl
 # Default REPS=500 keeps runtime moderate; publication numbers use
-#   REPS=5000 julia --project=. examples/montecarlo.jl
+#   REPS=5000 CALIB_B=9999 julia -t auto --project=. examples/montecarlo.jl
 using VoigtInference, Random, Printf, Statistics
+import LinearAlgebra
+LinearAlgebra.BLAS.set_num_threads(1)   # replications are the parallel unit
 
 include(joinpath(@__DIR__, "boundary_lr.jl"))
 
@@ -38,26 +43,30 @@ const STARTS = 7                          # robust deterministic multistart
 function run_design(λ, n, seed, cutg, cutc)
     γ0 = λ * SIGMA0
     θ0 = (MU0, SIGMA0, γ0)
-    rng = MersenneTwister(seed)
     est = fill(NaN, REPS, 3)
-    covered = falses(REPS, 3)             # unconditional: invalid SE = not covered
-    sevalid = falses(REPS, 3)
-    conv = 0; sb = 0; gb = 0; ub = 0; pde = 0; pdo = 0
-    lr_gauss = 0; lr_cauchy = 0
-    terms = Dict{Symbol,Int}()
-    for r in 1:REPS
+    covered = fill(false, REPS, 3)        # unconditional: invalid SE = not covered
+    sevalid = fill(false, REPS, 3)        # Bool arrays, not BitArrays: threads
+    convA = fill(false, REPS); sbA = fill(false, REPS); gbA = fill(false, REPS)
+    ubA = fill(false, REPS); pdeA = fill(false, REPS); pdoA = fill(false, REPS)
+    lrgA = fill(false, REPS); lrcA = fill(false, REPS)
+    termA = Vector{Symbol}(undef, REPS)
+    Threads.@threads for r in 1:REPS
+        # per-replication seed, deterministic in (design, replication);
+        # 1e6 spacing > REPS keeps design blocks disjoint, and the result
+        # cannot depend on the thread schedule
+        rng = MersenneTwister(1_000_000 * seed + r)
         yr = rand_voigt(rng, n, MU0, SIGMA0, γ0)
         res = voigt_mle(yr; starts = STARTS)
         est[r, :] .= (res.μ, res.σ, res.γ)
-        res.converged            && (conv += 1)
-        res.sigma_boundary       && (sb += 1)
-        res.gamma_boundary       && (gb += 1)
-        res.upper_boundary       && (ub += 1)
-        res.expected_info_posdef && (pde += 1)
-        res.observed_info_posdef && (pdo += 1)
-        terms[res.termination] = get(terms, res.termination, 0) + 1
-        2 * (res.loglik - res.loglik_gaussian) ≤ cutg && (lr_gauss += 1)
-        2 * (res.loglik - res.loglik_cauchy)  ≤ cutc && (lr_cauchy += 1)
+        convA[r] = res.converged
+        sbA[r]  = res.sigma_boundary
+        gbA[r]  = res.gamma_boundary
+        ubA[r]  = res.upper_boundary
+        pdeA[r] = res.expected_info_posdef
+        pdoA[r] = res.observed_info_posdef
+        termA[r] = res.termination
+        lrgA[r] = 2 * (res.loglik - res.loglik_gaussian) ≤ cutg
+        lrcA[r] = 2 * (res.loglik - res.loglik_cauchy)  ≤ cutc
         for j in 1:3
             if isfinite(res.se[j]) && res.se[j] > 0
                 sevalid[r, j] = true
@@ -65,13 +74,19 @@ function run_design(λ, n, seed, cutg, cutc)
             end
         end
     end
+    terms = Dict{Symbol,Int}()
+    for r in 1:REPS
+        terms[termA[r]] = get(terms, termA[r], 0) + 1
+    end
     b   = [mean(est[:, j]) - θ0[j] for j in 1:3]
     rm  = [sqrt(mean((est[:, j] .- θ0[j]) .^ 2)) for j in 1:3]
     cvu = [count(covered[:, j]) / REPS for j in 1:3]
     nv  = [count(sevalid[:, j]) for j in 1:3]
     cvc = [nv[j] > 0 ? count(covered[:, j] .& sevalid[:, j]) / nv[j] : NaN for j in 1:3]
-    diag = (conv = conv, sb = sb, gb = gb, ub = ub, pde = pde, pdo = pdo,
-            se = minimum(nv), lrg = lr_gauss, lrc = lr_cauchy, terms = terms)
+    diag = (conv = count(convA), sb = count(sbA), gb = count(gbA),
+            ub = count(ubA), pde = count(pdeA), pdo = count(pdoA),
+            se = minimum(nv), lrg = count(lrgA), lrc = count(lrcA),
+            terms = terms)
     return b, rm, cvu, cvc, diag
 end
 
@@ -122,8 +137,8 @@ was estimated on (or effectively on) its boundary — the Cauchy or Gaussian
 component undetected. 'LR keeps' is the share in which the boundary
 likelihood-ratio test at the CALIBRATED finite-sample 5% cutoff (printed
 above; pivotal, so it depends only on n) does not reject the submodel; near
-the boundary this exceeds the flag shares because the width MLE is interior,
-of order n^(-1/2) or n^(-1/4), in about half of submodel-true samples. The
+the boundary this exceeds the flag shares because the width MLE frequently
+sits at a small interior value in submodel-true samples. The
 Cauchy-side cutoff approaches 2.706 (Self-Liang in τ = σ²); the Gaussian
 side is nonregular and its cutoff is a genuine finite-sample quantity.
 

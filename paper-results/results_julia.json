@@ -1,6 +1,6 @@
 {
   "language": "julia",
-  "versions": {"julia": "1.12.7"},
+  "versions": {"julia": "1.12.7", "SpecialFunctions": "2.9.0"},
   "platform": {
     "system": "Darwin",
     "machine": "arm64-apple-darwin25.5.0",
@@ -9,21 +9,21 @@
   },
   "n_per_obs": 100000,
   "fused_matches_public_api": 0.0,
-  "primitive": {"name": "SpecialFunctions.erfcx", "ns_per_obs": 84.76173633333333, "ns_per_obs_median": 84.83483333333336},
+  "primitive": {"name": "SpecialFunctions.erfcx", "ns_per_obs": 85.33684699999999, "ns_per_obs_median": 85.40947233333334},
   "per_obs": {
-    "log-density": {"ns_per_obs": 93.67672814814813, "ns_per_obs_median": 94.19566370370372, "ratio_to_density": 1.0},
-    "analytic score": {"ns_per_obs": 98.3393825925926, "ns_per_obs_median": 98.75589481481481, "ratio_to_density": 1.0497738823357552},
-    "analytic Hessian": {"ns_per_obs": 169.67422642857142, "ns_per_obs_median": 170.75242571428572, "ratio_to_density": 1.811274046209583},
-    "fused ll+grad+hess": {"ns_per_obs": 96.0483573076923, "ns_per_obs_median": 96.12534442307692, "ratio_to_density": 1.0253171647476147},
-    "ll+score+hess (3 evals)": {"ns_per_obs": 352.65385375, "ns_per_obs_median": 355.46364625, "ratio_to_density": 3.764583378619757},
-    "FD score (6 evals)": {"ns_per_obs": 538.974, "ns_per_obs_median": 539.7606659999999, "ratio_to_density": 5.753552783649979},
-    "FD Hessian (24 evals)": {"ns_per_obs": 2038.542915, "ns_per_obs_median": 2044.779375, "ratio_to_density": 21.761465790906783}
+    "log-density": {"ns_per_obs": 96.42905851851853, "ns_per_obs_median": 96.7229937037037, "ratio_to_density": 1.0},
+    "analytic score": {"ns_per_obs": 99.81721153846156, "ns_per_obs_median": 100.0153846153846, "ratio_to_density": 1.0351362242045778},
+    "analytic Hessian": {"ns_per_obs": 175.17201923076925, "ns_per_obs_median": 178.77056115384613, "ratio_to_density": 1.816589541804234},
+    "fused ll+grad+hess": {"ns_per_obs": 96.61285230769231, "ns_per_obs_median": 97.41607384615384, "ratio_to_density": 1.0019060000377218},
+    "ll+score+hess (3 evals)": {"ns_per_obs": 361.03654714285716, "ns_per_obs_median": 362.6466671428571, "ratio_to_density": 3.7440637987098313},
+    "FD score (6 evals)": {"ns_per_obs": 550.57075, "ns_per_obs_median": 551.47875, "ratio_to_density": 5.70959375170366},
+    "FD Hessian (24 evals)": {"ns_per_obs": 2090.804375, "ns_per_obs_median": 2098.174585, "ratio_to_density": 21.682306216838935}
   },
   "mle": [
-    {"n": 1000, "seconds": 0.001301333, "iterations": 5, "seconds_per_iteration": 0.0002602666, "converged": true, "mu": 0.48195168007321193, "sigma": 0.9511623280312814, "gamma": 0.31441464031163846, "loglik": -1954.5199852446488},
-    {"n": 10000, "seconds": 0.014287916, "iterations": 6, "seconds_per_iteration": 0.0023813193333333334, "converged": true, "mu": 0.5041406479086927, "sigma": 1.0000551534331403, "gamma": 0.2933141186062151, "loglik": -19602.85005043007},
-    {"n": 100000, "seconds": 0.14372925, "iterations": 6, "seconds_per_iteration": 0.023954875, "converged": true, "mu": 0.4999761980005119, "sigma": 1.0025570302199172, "gamma": 0.29791793016157375, "loglik": -196660.2690382661}
+    {"n": 1000, "seconds": 0.00134825, "iterations": 5, "seconds_per_iteration": 0.00026965, "converged": true, "mu": 0.4819516800732109, "sigma": 0.9511623280313127, "gamma": 0.3144146403116145, "loglik": -1954.519985244647},
+    {"n": 10000, "seconds": 0.014238417, "iterations": 6, "seconds_per_iteration": 0.0023730695, "converged": true, "mu": 0.504140647908693, "sigma": 1.0000551534331001, "gamma": 0.29331411860625184, "loglik": -19602.850050430065},
+    {"n": 100000, "seconds": 0.143980542, "iterations": 6, "seconds_per_iteration": 0.023996756999999997, "converged": true, "mu": 0.49997619800051196, "sigma": 1.002557030219915, "gamma": 0.29791793016157714, "loglik": -196660.26903826612}
   ],
-  "fisher": {"nodes": 400, "seconds": 7.038159158200291e-5, "seconds_median": 7.088906632801161e-5},
-  "throughput": {"n": 10000, "fits": 140, "seconds": 2.009971125, "fits_per_sec": 69.65274190195146}
+  "fisher": {"nodes": 400, "seconds": 7.083525358719647e-5, "seconds_median": 7.158324116997792e-5},
+  "throughput": {"n": 10000, "fits": 136, "seconds": 2.001501625, "fits_per_sec": 67.94898305416065}
 }

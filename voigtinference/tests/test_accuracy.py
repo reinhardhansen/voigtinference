@@ -223,11 +223,15 @@ def _worst_case(kind, override_hess_switch=None):
     worst, where, regime = 0.0, 0.0, None
     for sigma, gamma in REGIMES:
         scale = _scale(sigma, gamma)
-        for mult in np.logspace(0, 6, 40):
+        hsw = _hess_switch(sigma, gamma) if override_hess_switch is None \
+            else override_hess_switch
+        # decade grid plus both sides of each dispatch crossing, where the
+        # exact-branch error peaks -- grid placement must not decide the worst
+        crossings = [m for sw in (_score_switch(sigma, gamma), hsw)
+                     for m in (0.999 * sw, 1.001 * sw) if m > 0]
+        for mult in np.concatenate([np.logspace(0, 6, 40), crossings]):
             yt = mult * scale
             s_t, h_t = _truth(yt, sigma, gamma)
-            hsw = _hess_switch(sigma, gamma) if override_hess_switch is None \
-                else override_hess_switch
             if kind == "score":
                 got = _tail_branch(yt, sigma, gamma)[0] if mult > _score_switch(sigma, gamma) \
                     else _exact_branch(yt, sigma, gamma)[0]
@@ -242,26 +246,28 @@ def _worst_case(kind, override_hess_switch=None):
 
 
 def test_score_worst_case_relative_error():
-    # certified normwise bound 5.4e-7 on the decade grid; margin for the
-    # intermediate ratios probed here
+    # validated normwise bound 1.4e-10 over the full certify.jl grid
+    # (worst case at the r_s crossing); wide margin for platform variation
     worst, where, regime = _worst_case("score")
-    assert worst < 5e-6, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
+    assert worst < 1e-8, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
 
 
 def test_hessian_worst_case_relative_error():
-    # certified normwise bound 1.5e-3 (branch crossover); margin as above
+    # validated normwise bound 6.3e-7 over the full certify.jl grid
+    # (worst case at the r_h crossing); margin as above
     worst, where, regime = _worst_case("hessian")
-    assert worst < 5e-3, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
+    assert worst < 1e-5, f"{worst:.2e} at mult={where:.0f}, (sigma, gamma)={regime}"
 
 
 def test_sharing_the_score_switch_would_degrade_the_hessian():
-    """The regression the r_s/r_h split exists to prevent.  With the
-    third-order branches the degradation is no longer catastrophic, but
-    forcing the Hessian to use the score threshold still costs more than
-    two orders of magnitude in its worst case."""
+    """The regression the r_s/r_h split exists to prevent.  After the
+    minimax retune the switches sit a factor five apart in r (r_s = 1e-4,
+    r_h = 5e-4), so forcing the Hessian to use the score threshold costs
+    about two orders of magnitude (7.1e-5 vs 6.3e-7 on the certify grid);
+    assert a factor 30 for platform robustness."""
     split, _, _ = _worst_case("hessian")
     shared, _, _ = _worst_case("hessian", override_hess_switch=SCORE_SWITCH)
-    assert shared > 1e2 * split
+    assert shared > 30 * split, (shared, split)
 
 
 # ------------------------------------------- the dispatched public interface

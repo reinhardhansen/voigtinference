@@ -75,13 +75,13 @@ _LOG_SQRT2PI = 0.5 * np.log(2.0 * np.pi)
 #: order after integration.  That makes the branch MORE accurate than the
 #: exact formulas well before the cancellation becomes visible.  The
 #: thresholds are the minimax optima from the certify.jl tune scan
-#: (worst pointwise error: score ~2e-9 at r_s = 1e-5, Hessian ~6e-6 at
+#: (worst pointwise error: score ~1e-10 at r_s = 1e-4, Hessian ~6e-7 at
 #: r_h = 5e-4), and the small exact zones also remove the integrated
 #: information-identity violation that large exact-branch zones caused
 #: at gamma/sigma ~ 50-100.  Certified by the Julia
 #: package's examples/certify.jl over gamma/sigma in [1e-8, 1e8]; see its
 #: output for current bounds.  Values must match Julia bit for bit.
-_R_SCORE = 1.0e-5    # score and conditional moments switch where r < _R_SCORE
+_R_SCORE = 1.0e-4    # score and conditional moments switch where r < _R_SCORE
 _R_HESS = 5.0e-4     # Hessian switches where r < _R_HESS
 
 
@@ -257,7 +257,7 @@ def _score_tail(ytil, sigma, gamma):
     log density,
 
         log f = log c + (sigma^2/2) A + (sigma^4/8) (B - A^2)
-                + sigma^6 (C/48 - A B/8 + A^3/24),
+                + sigma^6 (C/48 - A B/16 + A^3/24),
 
     with c the Lorentzian density and A = c2/c, B = c4/c, C = c6/c the
     ratios of its even derivatives.  Deriving all entries from the same truncated
@@ -278,22 +278,22 @@ def _score_tail(ytil, sigma, gamma):
     rs2 = (sigma * sigma) / den
     smu = ur * (2.0 + rs2 * (6.0 * w - 10.0 * v)
                 + rs2 * rs2 * (42.0 * w * w - 204.0 * w * v + 74.0 * v * v)
-                + rs2 * rs2 * rs2 * (144.0 * w * w * w - 2736.0 * w * w * v
-                                     + 3696.0 * w * v * v - 592.0 * v * v * v))
+                + rs2 * rs2 * rs2 * (414.0 * w * w * w - 3846.0 * w * w * v
+                                     + 4506.0 * w * v * v - 706.0 * v * v * v))
     ssig = (sigma / den) * ((6.0 * w - 2.0 * v)
                             + rs2 * (42.0 * w * w - 108.0 * w * v
                                      + 10.0 * v * v)
-                            + rs2 * rs2 * (144.0 * w * w * w - 1944.0 * w * w * v
-                                           + 1440.0 * w * v * v
-                                           - 56.0 * v * v * v))
+                            + rs2 * rs2 * (414.0 * w * w * w - 2574.0 * w * w * v
+                                           + 1674.0 * w * v * v
+                                           - 74.0 * v * v * v))
     sgam = (w - v) / gamma + gr * rs2 * ((2.0 * v - 14.0 * w)
                                          + rs2 * (-138.0 * w * w
                                                   + 172.0 * w * v
                                                   - 10.0 * v * v)
-                                         + rs2 * rs2 * (-936.0 * w * w * w
-                                                        + 4200.0 * w * w * v
-                                                        - 1976.0 * w * v * v
-                                                        + 56.0 * v * v * v))
+                                         + rs2 * rs2 * (-1686.0 * w * w * w
+                                                        + 5406.0 * w * w * v
+                                                        - 2306.0 * w * v * v
+                                                        + 74.0 * v * v * v))
     return smu, ssig, sgam
 
 
@@ -386,41 +386,41 @@ def _hessian_tail(ytil, sigma, gamma):
            + rs2 * (18.0 * w * w - 68.0 * w * v + 10.0 * v * v)
            + rs2 * rs2 * (210.0 * w * w * w - 1638.0 * w * w * v
                           + 1278.0 * w * v * v - 74.0 * v * v * v)
-           + rs2 * rs2 * rs2 * (1008.0 * w * w * w * w - 25632.0 * w * w * w * v
-                                + 54336.0 * w * w * v * v
-                                - 18784.0 * w * v * v * v + 592.0 * v * v * v * v)) / den
+           + rs2 * rs2 * rs2 * (2898.0 * w * w * w * w - 37512.0 * w * w * w * v
+                                + 68796.0 * w * w * v * v
+                                - 22696.0 * w * v * v * v + 706.0 * v * v * v * v)) / den
     Hms = (sigma / den) * ur * ((12.0 * w - 20.0 * v)
                                 + rs2 * (168.0 * w * w - 816.0 * w * v
                                          + 296.0 * v * v)
-                                + rs2 * rs2 * (864.0 * w * w * w
-                                               - 16416.0 * w * w * v
-                                               + 22176.0 * w * v * v
-                                               - 3552.0 * v * v * v))
+                                + rs2 * rs2 * (2484.0 * w * w * w
+                                               - 23076.0 * w * w * v
+                                               + 27036.0 * w * v * v
+                                               - 4236.0 * v * v * v))
     Hmg = ur * gr * (-4.0 + rs2 * (40.0 * v - 56.0 * w)
                      + rs2 * rs2 * (-828.0 * w * w + 1928.0 * w * v
                                     - 444.0 * v * v)
-                     + rs2 * rs2 * rs2 * (-7488.0 * w * w * w
-                                          + 47616.0 * w * w * v
-                                          - 40512.0 * w * v * v
-                                          + 4736.0 * v * v * v))
+                     + rs2 * rs2 * rs2 * (-13488.0 * w * w * w
+                                          + 64176.0 * w * w * v
+                                          - 49296.0 * w * v * v
+                                          + 5648.0 * v * v * v))
     Hss = ((6.0 * w - 2.0 * v)
            + rs2 * (126.0 * w * w - 324.0 * w * v + 30.0 * v * v)
-           + rs2 * rs2 * (720.0 * w * w * w - 9720.0 * w * w * v
-                          + 7200.0 * w * v * v - 280.0 * v * v * v)) / den
+           + rs2 * rs2 * (2070.0 * w * w * w - 12870.0 * w * w * v
+                          + 8370.0 * w * v * v - 370.0 * v * v * v)) / den
     Hgs = (sigma / den) * gr * ((4.0 * v - 28.0 * w)
                                 + rs2 * (-552.0 * w * w + 688.0 * w * v
                                          - 40.0 * v * v)
-                                + rs2 * rs2 * (-5616.0 * w * w * w
-                                               + 25200.0 * w * w * v
-                                               - 11856.0 * w * v * v
-                                               + 336.0 * v * v * v))
+                                + rs2 * rs2 * (-10116.0 * w * w * w
+                                               + 32436.0 * w * w * v
+                                               - 13836.0 * w * v * v
+                                               + 444.0 * v * v * v))
     Hgg = ((v - 4.0 * w)
            + rs2 * (-14.0 * w * w + 76.0 * w * v - 6.0 * v * v)
            + rs2 * rs2 * (-138.0 * w * w * w + 1758.0 * w * w * v
                           - 1254.0 * w * v * v + 50.0 * v * v * v)
-           + rs2 * rs2 * rs2 * (-936.0 * w * w * w * w + 24768.0 * w * w * w * v
-                                - 56080.0 * w * w * v * v
-                                + 18176.0 * w * v * v * v - 392.0 * v * v * v * v)) / den \
+           + rs2 * rs2 * rs2 * (-1686.0 * w * w * w * w + 38136.0 * w * w * w * v
+                                - 70996.0 * w * w * v * v
+                                + 21272.0 * w * v * v * v - 518.0 * v * v * v * v)) / den \
           - (w * w) / (gamma * gamma)
     return Hmm, Hms, Hmg, Hss, Hgs, Hgg
 

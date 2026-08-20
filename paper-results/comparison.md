@@ -1,7 +1,7 @@
 # Voigt inference: Python vs Julia
 
 - **Python**: python 3.14.7, numpy 2.5.2, scipy 1.18.0 on arm64 (arm)
-- **Julia**: julia 1.12.7 on arm64-apple-darwin25.5.0 (apple-m1)
+- **Julia**: julia 1.12.7, SpecialFunctions 2.9.0 on arm64-apple-darwin25.5.0 (apple-m1)
 
 ## 1. The Faddeeva primitive
 
@@ -9,8 +9,8 @@ This is the floor. It is not a language difference but a difference between two 
 
 | implementation | ns/obs |
 | --- | ---: |
-| Python — `scipy.special.wofz` | 71.0 |
-| Julia — `SpecialFunctions.erfcx` | 84.8 |
+| Python — `scipy.special.wofz` | 71.7 |
+| Julia — `SpecialFunctions.erfcx` | 85.3 |
 
 Julia / Python = **1.19x**
 
@@ -20,13 +20,13 @@ The **ratio** column is the language-independent quantity and the one the paper 
 
 | task | Python ns/obs | Python ratio | Julia ns/obs | Julia ratio | Julia/Python |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| log-density | 77.1 | 1.00x | 93.7 | 1.00x | 1.22x |
-| analytic score | 81.5 | 1.06x | 98.3 | 1.05x | 1.21x |
-| analytic Hessian | 96.0 | 1.25x | 169.7 | 1.81x | 1.77x |
-| fused ll+grad+hess | 95.5 | 1.24x | 96.0 | 1.03x | 1.01x |
-| FD score (6 evals) | 464.8 | 6.03x | 539.0 | 5.75x | 1.16x |
-| FD Hessian (24 evals) | 1866.5 | 24.22x | 2038.5 | 21.76x | 1.09x |
-| ll+score+hess (3 evals) | -- | --x | 352.7 | 3.76x | --x |
+| log-density | 78.6 | 1.00x | 96.4 | 1.00x | 1.23x |
+| analytic score | 82.7 | 1.05x | 99.8 | 1.04x | 1.21x |
+| analytic Hessian | 98.3 | 1.25x | 175.2 | 1.82x | 1.78x |
+| fused ll+grad+hess | 96.3 | 1.23x | 96.6 | 1.00x | 1.00x |
+| FD score (6 evals) | 467.9 | 5.95x | 550.6 | 5.71x | 1.18x |
+| FD Hessian (24 evals) | 1901.1 | 24.19x | 2090.8 | 21.68x | 1.10x |
+| ll+score+hess (3 evals) | -- | --x | 361.0 | 3.74x | --x |
 
 ## 3. End-to-end maximum likelihood
 
@@ -34,23 +34,23 @@ Same data, same starting values, same tolerance. Compare the iteration counts be
 
 | n | Python s | its | passes | Julia s | its | Julia/Python |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1000 | 0.0024 | 5 | 6 | 0.0013 | 5 | 0.55x |
-| 10000 | 0.0100 | 6 | 7 | 0.0143 | 6 | 1.43x |
-| 100000 | 0.0755 | 6 | 7 | 0.1437 | 6 | 1.90x |
+| 1000 | 0.0022 | 5 | 6 | 0.0013 | 5 | 0.61x |
+| 10000 | 0.0096 | 6 | 7 | 0.0142 | 6 | 1.48x |
+| 100000 | 0.0793 | 6 | 7 | 0.1440 | 6 | 1.82x |
 
-`passes` counts Faddeeva evaluations over the whole sample. The Python implementation fuses the gradient and Hessian into one pass and reuses the line search's evaluation at the accepted step, so an accepted Newton iteration costs one pass; the shipped Julia package evaluates `w(z)` separately for the score and the Hessian.
+`passes` counts Faddeeva evaluations over the whole sample. The Python implementation fuses the gradient and Hessian into one pass and reuses the line search's evaluation at the accepted step, so an accepted Newton iteration costs one pass there and two in Julia (the accepted trial's log-likelihood plus the fused gradient/Hessian pass); both use the fused per-point kernel.
 
 ### Do the two agree?
 
 | n | max rel. diff in (mu, sigma, gamma) | rel. diff in loglik |
 | ---: | ---: | ---: |
-| 1000 | 3.87e-14 | 1.16e-16 |
-| 10000 | 5.20e-14 | 2.23e-15 |
-| 100000 | 4.77e-14 | 5.33e-15 |
+| 1000 | 3.00e-15 | 5.82e-16 |
+| 10000 | 3.71e-14 | 2.41e-15 |
+| 100000 | 4.10e-14 | 5.18e-15 |
 
 ## 4. Fisher quadrature and fit throughput
 
 | quantity | Python | Julia |
 | --- | ---: | ---: |
 | Fisher information, 400 nodes (ms) | 0.10 | 0.07 |
-| fits/s at n = 10000 | 108.2 | 69.7 |
+| fits/s at n = 10000 | 107.5 | 67.9 |

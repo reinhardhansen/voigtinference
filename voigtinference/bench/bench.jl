@@ -172,7 +172,7 @@ function fused_one_eval(y, mu, sg, gm)
     aim = gm / den2
     logconst = log(sg) + 0.5 * log(2 * pi)
     g2 = gm * gm
-    r_s = 1.0e-5                        # score switch   (matches the package)
+    r_s = 1.0e-4                        # score switch   (matches the package)
     r_h = 5.0e-4                        # Hessian switch (matches the package)
     @inbounds for yi in y
         yt = yi - mu

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Guard the far-tail switch constants across their four duplication sites.
+"""Guard the far-tail switch constants across their five duplication sites.
 
 The Cauchy-limit branch thresholds r_s (score/moments) and r_h (Hessian) are
 certified by VoigtInference.jl/examples/certify.jl and must be numerically
 identical in:
 
     1. VoigtInference.jl/src/VoigtInference.jl   (_far_tail / _far_tail_hess)
-    2. voigtinference/src/voigtinference/core.py (_R_SCORE / _R_HESS)
-    3. voigtinference/bench/bench.jl             (fused benchmark kernel)
-    4. VoigtInference.jl/examples/certify.jl     (ypoints switch thresholds)
+    2. VoigtInference.jl/src/VoigtInference.jl   (fused-kernel locals r_s/r_h)
+    3. voigtinference/src/voigtinference/core.py (_R_SCORE / _R_HESS)
+    4. voigtinference/bench/bench.jl             (fused benchmark kernel)
+    5. VoigtInference.jl/examples/certify.jl     (ypoints switch thresholds)
 
 Run from the repository root (exit code 1 on any mismatch):
 
@@ -22,7 +23,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 if not (ROOT / "voigtinference").is_dir():        # staged in repo/ in the
     ROOT = pathlib.Path.cwd()                     # Drive tree; run from CPC/
 
-R_S = "1.0e-5"
+R_S = "1.0e-4"
 R_H = "5.0e-4"
 
 
@@ -44,6 +45,10 @@ def main():
          r"_far_tail\(ỹ, σ, γ\)\s*=\s*σ\^2 <\s*([0-9.e+-]+)", [R_S]),
         ("VoigtInference.jl/src/VoigtInference.jl",
          r"_far_tail_hess\(ỹ, σ, γ\)\s*=\s*σ\^2 <\s*([0-9.e+-]+)", [R_H]),
+        ("VoigtInference.jl/src/VoigtInference.jl",
+         r"r_s\s*=\s*([0-9.e+-]+)", [R_S]),
+        ("VoigtInference.jl/src/VoigtInference.jl",
+         r"r_h\s*=\s*([0-9.e+-]+)", [R_H]),
         ("voigtinference/src/voigtinference/core.py",
          r"_R_SCORE\s*=\s*([0-9.e+-]+)", [R_S]),
         ("voigtinference/src/voigtinference/core.py",
@@ -62,9 +67,11 @@ def main():
             print(f"MISSING  {path}: pattern {pattern!r} not found")
             ok = False
             continue
-        got = found[0] if len(expected) == 1 else found[: len(expected)]
-        got = [got] if isinstance(got, str) else list(got)
-        for g, e in zip(got, expected):
+        if len(expected) == 1:
+            got, exp = found, expected * len(found)   # every occurrence
+        else:
+            got, exp = found[: len(expected)], expected
+        for g, e in zip(got, exp):
             status = "ok " if close(g, e) else "FAIL"
             if status == "FAIL":
                 ok = False
