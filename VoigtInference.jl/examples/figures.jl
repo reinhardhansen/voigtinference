@@ -1,8 +1,10 @@
 # Section 6(iii)+(iv): pseudo-Voigt width bias and the redescending
-# deconvolution figure. Requires Plots.jl (only this script does):
-#   using Pkg; Pkg.add("Plots")
-#
-# Run from the package directory:  julia --project=. examples/figures.jl
+# deconvolution figure. Requires Plots.jl, provided by the examples
+# project (examples/Project.toml), NOT the package project. One-time setup
+# from the repository root:
+#   julia --project=VoigtInference.jl/examples -e 'using Pkg; Pkg.develop(path="VoigtInference.jl"); Pkg.instantiate()'
+# Run from the repository root:
+#   julia --project=VoigtInference.jl/examples VoigtInference.jl/examples/figures.jl
 # Figures are written to examples/output/.
 using VoigtInference, Random, Printf, Statistics
 using Plots

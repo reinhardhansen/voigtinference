@@ -31,7 +31,7 @@ import numpy as np
 from .core import loglik_grad_hess, loglik_only
 from .fisher import voigt_fisher
 
-__all__ = ["voigt_mle", "VoigtMLEResult"]
+__all__ = ["voigt_mle", "VoigtMLEResult", "boundary_lr"]
 
 
 @dataclass
@@ -367,7 +367,8 @@ def _newton_core(y, eta0, lb, ub, maxiter, gtol, verbose):
             y, eta[0], np.exp(eta[1]), np.exp(eta[2]),
             need_hess=False, need_ll=False, _kl_cache=cache,
         )
-        nfev += 1
+        # no nfev increment: the cached (K, L, ytil) triple is reused, so
+        # this costs no new Faddeeva pass over the sample
         g = np.array([1.0, np.exp(eta[1]), np.exp(eta[2])]) * (g_raw / n)
         if np.all(np.isfinite(g)) and _projnorm(g, eta, lb, ub) < gtol:
             converged = True
@@ -420,14 +421,38 @@ def voigt_mle(
     ``sqrt(n)`` although the Voigt profile has no finite positive integer
     moments. Wald standard errors are not valid at parameter boundaries and
     are suppressed there; compare ``loglik`` with ``loglik_gaussian`` and
-    ``loglik_cauchy`` instead. The optimiser does not raise on finite data.
+    ``loglik_cauchy`` instead. The optimiser does not raise on finite,
+    nondegenerate samples; degenerate input for which the closed-family
+    MLE does not exist (a value tied in at least half of the observations)
+    is rejected with an explanatory error.
     """
-    y = np.asarray(y, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64)
+    if y.ndim > 1:
+        raise ValueError("y must be one-dimensional (no silent flattening)")
+    y = y.ravel()
     n = y.size
     if n < 3:
         raise ValueError("need at least 3 observations")
     if not np.all(np.isfinite(y)):
         raise ValueError("data contain non-finite values")
+    # MLE-existence guard: if one exact value occupies at least HALF the
+    # sample, the closed-family likelihood is unbounded or its supremum is
+    # not attained, so no finite clamp value may be reported as a maximized
+    # likelihood.  With the tied value as location and gamma -> 0, the
+    # Cauchy submodel gives ll_C = (n - 2m) log(gamma) + O(1): a strict
+    # majority (2m > n) sends it to +inf; an exact half (2m = n) can leave
+    # a finite zero-width supremum that no positive width attains.  Exact
+    # ties are a probability-zero event under the continuous model but
+    # occur in rounded or digitized data.
+    m = int(np.unique(y, return_counts=True)[1].max())
+    if 2 * m >= n:
+        raise ValueError(
+            f"closed-family MLE does not exist: one value occurs {m} times "
+            f"in {n} observations (at least half). The likelihood is "
+            "unbounded for a strict majority tie, and the zero-width "
+            "supremum may be nonattained for an exact half; the data are "
+            "degenerate for this model (rounded or truncated input?)"
+        )
     if not isinstance(maxiter, (int, np.integer)) or isinstance(maxiter, bool) \
             or maxiter < 1:
         raise ValueError("maxiter must be an integer >= 1")
@@ -609,8 +634,19 @@ def boundary_lr(res):
     clamp-residual below the exact submodel likelihood, so the raw
     difference can be negative by far more than roundoff.
 
+    The interior component is the RETURNED multistart interior candidate
+    (the optimiser is a local method), so this is the computed
+    closed-family comparison, not a certificate of the global interior
+    supremum.
+
     Returns ``(lr_gaussian, lr_cauchy)``.
     """
-    llfull = max(res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    lls = (res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    if not all(np.isfinite(v) for v in lls):
+        raise ValueError(
+            f"boundary_lr requires finite likelihoods, got {lls}; "
+            "a nonfinite submodel likelihood indicates degenerate input"
+        )
+    llfull = max(lls)
     return (max(0.0, 2.0 * (llfull - res.loglik_gaussian)),
             max(0.0, 2.0 * (llfull - res.loglik_cauchy)))

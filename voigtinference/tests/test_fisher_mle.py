@@ -93,3 +93,29 @@ def test_mle_survives_a_degenerate_sample():
     r = voigt_mle(y)
     assert np.isfinite(r.mu)
     assert r.sigma > 0
+
+
+def test_tied_sample_mle_existence_guard():
+    """The closed-family MLE does not exist when one value occupies at
+    least half the sample: with the tied value as location and
+    gamma -> 0, ll_C = (n - 2m) log(gamma) + O(1) -> +inf for a strict
+    majority, and the zero-width supremum can be nonattained for an
+    exact half.  The guard must reject such input rather than report a
+    finite clamp value as a maximized likelihood, and boundary_lr must
+    never emit an infinite statistic."""
+    from voigtinference import boundary_lr
+
+    for bad in ([1.0, 1.0, 1.0],                    # all equal
+                [0.0, 0.0, 1.0],                    # strict majority
+                [0.0, 0.0, 0.0, 1.0, 2.0],          # strict majority
+                [0.0, 0.0, 1.0, -2.0]):             # exact half
+        with pytest.raises(ValueError):
+            voigt_mle(bad)
+    with pytest.raises(ValueError):                 # no silent 2-D flattening
+        voigt_mle(np.ones((3, 4)))
+    # repeated values below half the sample are ordinary data
+    y = np.array([0.0, 0.0, 1.0, 2.0, 3.0, -1.5, 0.7])
+    r = voigt_mle(y)
+    assert np.isfinite(r.loglik)
+    lrg, lrc = boundary_lr(r)
+    assert np.isfinite(lrg) and np.isfinite(lrc)

@@ -17,8 +17,9 @@ so `Y ~ 𝒱(μ, σ, γ)` with density `f(y) = K(x,a)/(σ√(2π))`, where `K = 
 
 Because `w′(z) = −2z w(z) + 2i/√π`, the score, Hessian, Fisher information, and
 the conditional moments of the Gaussian component are all algebraic in `(K, L)`.
-No numerical convolution, finite differences, automatic differentiation, or
-pseudo-Voigt approximations are used anywhere.
+Within this package's model — the normalized, non-relativistic, constant-width
+Voigt distribution — no numerical convolution, finite differences, automatic
+differentiation, or pseudo-Voigt approximations are used.
 
 ## Usage
 

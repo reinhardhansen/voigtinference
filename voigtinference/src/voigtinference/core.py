@@ -74,7 +74,8 @@ _LOG_SQRT2PI = 0.5 * np.log(2.0 * np.pi)
 #: O(r**3) pointwise and the likelihood identities hold to the retained
 #: order after integration.  That makes the branch MORE accurate than the
 #: exact formulas well before the cancellation becomes visible.  The
-#: thresholds are the minimax optima from the certify.jl tune scan
+#: thresholds are the selected optima on the finite validation scan
+#: (certify.jl tune)
 #: (worst pointwise error: score ~1e-10 at r_s = 1e-4, Hessian ~6e-7 at
 #: r_h = 5e-4), and the small exact zones also remove the integrated
 #: information-identity violation that large exact-branch zones caused

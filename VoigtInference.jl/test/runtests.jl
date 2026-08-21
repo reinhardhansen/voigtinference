@@ -265,3 +265,20 @@ end
         g == 1 && @test nzero_g ≥ 1
     end
 end
+
+@testset "tied-sample MLE-existence guard" begin
+    # the closed-family likelihood is unbounded for a strict majority tie
+    # (ℓ_C = (n - 2m) log γ + O(1) → +∞ as γ → 0 at the tied value) and
+    # its zero-width supremum can be nonattained for an exact half: reject,
+    # never report a finite clamp value as a maximized likelihood
+    @test_throws ArgumentError voigt_mle([1.0, 1.0, 1.0])
+    @test_throws ArgumentError voigt_mle([0.0, 0.0, 1.0])
+    @test_throws ArgumentError voigt_mle([0.0, 0.0, 0.0, 1.0, 2.0])
+    @test_throws ArgumentError voigt_mle([0.0, 0.0, 1.0, -2.0])
+    # repeated values below half the sample are ordinary data
+    y = [0.0, 0.0, 1.0, 2.0, 3.0, -1.5, 0.7]
+    r = voigt_mle(y)
+    @test isfinite(r.loglik)
+    lrg, lrc = boundary_lr(r)
+    @test isfinite(lrg) && isfinite(lrc)
+end

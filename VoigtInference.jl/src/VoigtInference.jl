@@ -139,8 +139,8 @@ end
 # one truncated log density, so their truncation error is O(r³) pointwise
 # and the likelihood identities hold after integration. The branch is
 # therefore MORE accurate than the exact formulas well before cancellation
-# becomes visible. The thresholds are the minimax optima from the
-# certify.jl tune scan (worst pointwise error: score ~1e-10 at r_s = 1e-4,
+# becomes visible. The thresholds are the selected optima on the finite
+# validation scan, certify.jl tune (worst pointwise error: score ~1e-10 at r_s = 1e-4,
 # Hessian ~6e-7 at r_h = 5e-4), and the small exact zones also remove the
 # integrated information-identity violation that large exact-branch zones
 # caused at γ/σ ~ 50-100. Certified by
@@ -747,6 +747,7 @@ Returns a NamedTuple with fields
   `loglik`             : maximized Voigt log-likelihood
   `converged`          : projected-gradient criterion met
   `termination`        : :gradient_converged | :max_iterations |
+                         :stalled_near_stationary | :submodel_dominates |
                          :no_ascent_direction | :line_search_failed |
                          :nonfinite_derivatives | :nonfinite_start
   `sigma_boundary, gamma_boundary, upper_boundary` : active clamps at the
@@ -766,13 +767,36 @@ Standard errors are asymptotic likelihood-based (Wald) quantities from the
 interior asymptotic-normality theorem for the iid Voigt MLE in the companion
 paper (arXiv:2605.01665); they are deliberately NOT reported at boundaries,
 where that theorem does not apply — use the boundary submodels instead. The
-optimizer never throws on finite data.
+optimizer never throws on finite, nondegenerate samples; degenerate input
+for which the closed-family MLE does not exist (a value tied in at least
+half of the observations) is rejected with an explanatory error.
 """
 function voigt_mle(y::AbstractVector; maxiter::Int = 200, gtol::Real = 1e-8,
                    nodes::Int = 400, starts::Int = 1, verbose::Bool = false)
     n = length(y)
     n ≥ 3 || throw(ArgumentError("need at least 3 observations"))
     all(isfinite, y) || throw(ArgumentError("data contain non-finite values"))
+    # MLE-existence guard: if one exact value occupies at least HALF the
+    # sample, the closed-family likelihood is unbounded or its supremum is
+    # not attained, so no finite clamp value may be reported as a maximized
+    # likelihood. With the tied value as location and γ → 0, the Cauchy
+    # submodel gives ℓ_C = (n - 2m) log γ + O(1): a strict majority
+    # (2m > n) sends it to +∞; an exact half (2m = n) can leave a finite
+    # zero-width supremum that no positive width attains. Exact ties are a
+    # probability-zero event under the continuous model but occur in
+    # rounded or digitized data.
+    ys = sort(y)
+    m = 1; run = 1
+    for i in 2:n
+        run = ys[i] == ys[i-1] ? run + 1 : 1
+        run > m && (m = run)
+    end
+    2m ≥ n && throw(ArgumentError(
+        "closed-family MLE does not exist: one value occurs $m times in " *
+        "$n observations (at least half). The likelihood is unbounded for " *
+        "a strict majority tie, and the zero-width supremum may be " *
+        "nonattained for an exact half; the data are degenerate for this " *
+        "model (rounded or truncated input?)"))
     maxiter ≥ 1 || throw(ArgumentError("maxiter must be ≥ 1"))
     gtol > 0 || throw(ArgumentError("gtol must be > 0"))
     nodes ≥ 2 || throw(ArgumentError("nodes must be ≥ 2"))
@@ -912,9 +936,17 @@ A raw difference `2(res.loglik - res.loglik_gaussian)` is NOT a valid
 LR: near a boundary the interior candidate legitimately sits a
 clamp-residual below the exact submodel likelihood, so the raw
 difference can be negative by far more than roundoff.
+
+The interior component is the RETURNED multistart interior candidate
+(the optimizer is a local method), so this is the computed closed-family
+comparison, not a certificate of the global interior supremum.
 """
 function boundary_lr(res)
-    llfull = max(res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    lls = (res.loglik, res.loglik_gaussian, res.loglik_cauchy)
+    all(isfinite, lls) || throw(ArgumentError(
+        "boundary_lr requires finite likelihoods, got $lls; a nonfinite " *
+        "submodel likelihood indicates degenerate input"))
+    llfull = max(lls...)
     return (max(0.0, 2 * (llfull - res.loglik_gaussian)),
             max(0.0, 2 * (llfull - res.loglik_cauchy)))
 end

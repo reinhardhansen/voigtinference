@@ -21,7 +21,9 @@
 # A pseudo-Voigt fit (Gaussian/Lorentzian mixture, same b, A) is reported for
 # comparison.
 #
-# Run from the package directory:  julia --project=. examples/raman.jl
+# Run from the repository root (uses the examples project for plotting;
+# see figures.jl for the one-time setup):
+#   julia --project=VoigtInference.jl/examples VoigtInference.jl/examples/raman.jl
 using VoigtInference, Printf, Statistics, DelimitedFiles, LinearAlgebra
 
 const HERE = @__DIR__

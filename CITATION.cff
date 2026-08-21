@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite both the software and the methods paper below."
 title: "voigtinference: Exact likelihood calculus and conditional attribution for the Voigt profile"
-version: 1.1.0
+version: 1.1.1
 date-released: 2026-08-20
 license: MIT
 repository-code: "https://github.com/reinhardhansen/voigtinference"

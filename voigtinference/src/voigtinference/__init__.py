@@ -34,7 +34,7 @@ from .fisher import voigt_fisher
 from .mle import VoigtMLEResult, boundary_lr, voigt_mle
 from .simulate import rand_voigt
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 __all__ = [
     "faddeeva",
